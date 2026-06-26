@@ -1,0 +1,14 @@
+{
+  "change": "add-node-health-monitor",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "2ba732969f1978e8b9323a616faa60fbffce0c1b54be7210016b8b0440ea7134",
+  "files": [
+    { "path": "openspec/changes/add-node-health-monitor/proposal.md", "sha256": "6091a767200d961b2147a1ffadd30410a33b2e6ff728e73f6e461ce2cee281ee" },
+    { "path": "openspec/changes/add-node-health-monitor/design.md", "sha256": "347d32449a20946e1023c128be2e0131165e1fe2134cc69349a9e9dddabc14e9" },
+    { "path": "openspec/changes/add-node-health-monitor/tasks.md", "sha256": "02f6d65dce1c1c37751566700bb3fc98b9167165da44182f04d70e51571eef00" },
+    { "path": "openspec/changes/add-node-health-monitor/specs/node-health-monitor/spec.md", "sha256": "0dc8faeeb79aa823b1ec0ff87dd91ed01ddd7248e0333eb2a1b7f85cbaee9784" }
+  ]
+}

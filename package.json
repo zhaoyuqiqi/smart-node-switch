@@ -8,5 +8,10 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "elysia": "^1.4.29",
+    "ioredis": "^5.11.1",
+    "p-queue": "^9.3.0"
   }
 }
