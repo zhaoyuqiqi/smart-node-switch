@@ -11,7 +11,7 @@ describe('probe', () => {
     const originalFetch = global.fetch;
     global.fetch = mock(() =>
       Promise.resolve(new Response(null, { status: 204 }))
-    ) as typeof fetch;
+    ) as unknown as typeof fetch;
 
     const { probe } = await import('./probe.ts');
     const result = await probe(30000, 'http://www.gstatic.com/generate_204', 5000);
@@ -24,7 +24,7 @@ describe('probe', () => {
 
   it('returns ok=false on network error', async () => {
     const originalFetch = global.fetch;
-    global.fetch = mock(() => Promise.reject(new Error('connection refused'))) as typeof fetch;
+    global.fetch = mock(() => Promise.reject(new Error('connection refused'))) as unknown as typeof fetch;
 
     const { probe } = await import('./probe.ts');
     const result = await probe(30001, 'http://www.gstatic.com/generate_204', 5000);
@@ -39,7 +39,7 @@ describe('probe', () => {
     const originalFetch = global.fetch;
     global.fetch = mock(() =>
       Promise.resolve(new Response(null, { status: 404 }))
-    ) as typeof fetch;
+    ) as unknown as typeof fetch;
 
     const { probe } = await import('./probe.ts');
     const result = await probe(30002, 'http://example.com', 5000);

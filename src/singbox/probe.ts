@@ -11,10 +11,9 @@ export async function probe(port: number, testUrl: string, timeoutMs: number): P
   const start = Date.now();
   try {
     const res = await fetch(testUrl, {
-      // @ts-expect-error Bun-specific fetch option
       proxy: `http://127.0.0.1:${port}`,
       signal: AbortSignal.timeout(timeoutMs),
-    });
+    } as RequestInit);
     const latencyMs = Date.now() - start;
     return { ok: res.status > 0 && res.status < 400, latencyMs };
   } catch {
