@@ -10,11 +10,17 @@
 
 ## 当前
 
-- 当前 task: Task 10（GET /proxy;openspec 6.1)
-- 阶段: implementing
-- task base commit: 8515a32
-- tsc 全绿;Task 9 已提交 8515a32(monitor 集成,110 pass,tsc 0)
-- batch[7-9]: APPROVED(仅 MINOR;0 轮修复)
+- 当前阶段: subagent 派发循环完成 → 返回 comet-build 退出条件
+- final review: round1 CHANGES-REQUESTED(C1 CRITICAL + I1 IMPORTANT)→ 修复 b4f7d55 → round2 RE-REVIEW APPROVED(C1/I1 resolved,无新问题,116 pass,tsc 0)
+- 已接受/跟进的非 CRITICAL(记录理由):
+  - I1 已设 1MiB pending 缓冲上限;established 管道背压未做 → 已在代码注释 + README 标注为已知限制
+  - M4(无可用→block 语义)自动化未覆盖 setSelector('block') 是否被 sing-box 接受 → 需用户在真实环境手动 e2e 验证「无可用节点→代理连接被拒」
+  - M1(1500ms 固定等待)/M2(legacy process.ts)/M3(temp config 不清理)/I2(waitReady 末轮 sleep)→ 合并后跟进,均不阻塞
+  - 7.1 live e2e 为手动非阻塞步骤(design §8);自动化 116 pass 为门禁,live e2e 文档化于 README
+- tsc 全绿,114 pass
+- Task 10 7b40782(/proxy) / Task 11 8ebc72a(index 装配+CV1/CV3) / Task 12 f109d86(README)
+- 已知风险:曾出现 1 次偶发 timing flake(后 5/5 绿);交 final review 评估是否加固 timing 测试
+- final review 残留 MINOR triage:relay 背压(MINOR2)、clash.waitReady 末轮 sleep 越界(MINOR4)、instance configPath 同 basePort 并发碰撞/1500ms 固定窗口(batch79 MINOR1/3)
 
 ### Task 11 接线必做清单(batch[7-9] Cannot-Verify,强约束)
 - (CV1) 蓝绿 swap 成功后,monitor 的 portMap+clash 必须经 onActiveInstance 更新为新实例,否则蓝绿后 monitor 对新节点失明(no port for)。orchestrator.onActiveChange → monitor 更新 portMap/clash。
@@ -34,8 +40,7 @@
 - batch [1-3]: APPROVED (spec ✅ / quality approved, 仅 MINOR;0 轮修复)
 - batch [4-6]: APPROVED (spec ✅ / quality approved, 仅 MINOR;0 轮修复)
 - batch [7-9]: APPROVED (spec ✅ / quality approved, 仅 MINOR;0 轮修复)
-- batch [4-6]: pending
-- batch [7-9]: pending
+- final review: APPROVED (round1 CHANGES-REQUESTED C1+I1 → fix b4f7d55 → round2 APPROVED)
 - batch [10-12]: pending
 - final: pending
 
