@@ -24,6 +24,7 @@ export function parseVless(uri: string): Node | null {
       protocol: 'vless',
       server,
       port,
+      originalUri: uri,
       raw: {
         uuid,
         flow: url.searchParams.get('flow') ?? '',

@@ -30,6 +30,8 @@ export function registerRoutes(app: Elysia, monitor: Monitor, store: StateStore)
         failCount: state!.failCount,
         lastCheck: state!.lastCheck,
         score: score(state!, now),
+        raw: node.raw,
+        originalUri: node.originalUri,
       }));
 
     return { count: result.length, nodes: result };
@@ -65,6 +67,8 @@ export function registerRoutes(app: Elysia, monitor: Monitor, store: StateStore)
           failCount: state.failCount,
           lastCheck: state.lastCheck,
           score: s,
+          raw: node.raw,
+          originalUri: node.originalUri,
         };
       }
     }

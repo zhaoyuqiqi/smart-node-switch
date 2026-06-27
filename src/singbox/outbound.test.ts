@@ -3,7 +3,7 @@ import { toOutbound } from './outbound.ts';
 import type { Node } from '../types.ts';
 
 function makeNode(overrides: Partial<Node> & Pick<Node, 'protocol' | 'server' | 'port' | 'raw'>): Node {
-  return { key: 'testkey12345678', name: 'TestNode', ...overrides };
+  return { key: 'testkey12345678', name: 'TestNode', originalUri: '', ...overrides };
 }
 
 describe('toOutbound - trojan', () => {
