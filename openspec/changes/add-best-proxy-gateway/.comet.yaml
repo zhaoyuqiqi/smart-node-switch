@@ -20,3 +20,5 @@ verified_at: null
 archived: false
 handoff_context: openspec/changes/add-best-proxy-gateway/.comet/handoff/design-context.json
 handoff_hash: 347b8634fcef91661d2545939d4b0322d42dddf211d30e3dfcb659e6309bd5b9
+build_command: bun run --bun tsc --noEmit
+verify_command: bun test src/
