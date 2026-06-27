@@ -83,11 +83,11 @@ export class TcpRelay {
         },
         close(client) {
           const pair = (client as unknown as { data: ConnPair }).data;
-          if (pair) self.teardown(pair, 'client');
+          if (pair) self.teardown(pair);
         },
         error(client) {
           const pair = (client as unknown as { data: ConnPair }).data;
-          if (pair) self.teardown(pair, 'client');
+          if (pair) self.teardown(pair);
         },
       },
     });
@@ -96,11 +96,18 @@ export class TcpRelay {
   private async connectUpstream(pair: ConnPair): Promise<void> {
     const self = this;
     try {
-      pair.upstream = await Bun.connect({
+      const upstream = await Bun.connect({
         hostname: this.upstreamHost,
         port: pair.upstreamPort,
         socket: {
           open(up) {
+            // The client may have already disconnected while this upstream
+            // connection was still pending. In that case the pair was torn
+            // down and removed from `conns`; close this orphaned upstream now.
+            if (!self.conns.has(pair)) {
+              try { up.end(); } catch {}
+              return;
+            }
             pair.upstreamReady = true;
             for (const buffered of pair.clientBuffer) up.write(buffered);
             pair.clientBuffer = [];
@@ -109,19 +116,27 @@ export class TcpRelay {
             pair.client.write(chunk);
           },
           close() {
-            self.teardown(pair, 'upstream');
+            self.teardown(pair);
           },
           error() {
-            self.teardown(pair, 'upstream');
+            self.teardown(pair);
           },
         },
       });
+      // If the pair was torn down before connect resolved, the `open` handler
+      // above may not have run yet (or ran before assignment); ensure the
+      // freshly resolved socket is closed rather than orphaned.
+      if (!this.conns.has(pair)) {
+        try { upstream.end(); } catch {}
+        return;
+      }
+      pair.upstream = upstream;
     } catch {
-      this.teardown(pair, 'upstream');
+      this.teardown(pair);
     }
   }
 
-  private teardown(pair: ConnPair, _origin: 'client' | 'upstream'): void {
+  private teardown(pair: ConnPair): void {
     if (!this.conns.has(pair)) return;
     this.conns.delete(pair);
     try { pair.client.end(); } catch {}
@@ -131,6 +146,6 @@ export class TcpRelay {
   stop(): void {
     this.server?.stop(true);
     this.server = null;
-    for (const pair of [...this.conns]) this.teardown(pair, 'client');
+    for (const pair of [...this.conns]) this.teardown(pair);
   }
 }

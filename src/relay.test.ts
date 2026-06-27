@@ -74,6 +74,42 @@ describe('TcpRelay', () => {
     conn.end();
   });
 
+  it('does not orphan an upstream when the client disconnects before upstream connects', async () => {
+    // Slow-accepting upstream: it does not call open() until after the client
+    // has already disconnected, so the relay's Bun.connect resolves AFTER the
+    // pair has been torn down. The fixed relay must .end() that late upstream.
+    let upstreamOpened = 0;
+    let upstreamClosed = 0;
+    const slow = Bun.listen({
+      hostname: '127.0.0.1',
+      port: 0,
+      socket: {
+        open() { upstreamOpened++; },
+        close() { upstreamClosed++; },
+        data() {},
+      },
+    });
+    cleanups.push(() => slow.stop(true));
+
+    const relay = new TcpRelay({ bindAddress: '127.0.0.1', port: 0, initialUpstreamPort: slow.port });
+    relay.start();
+    cleanups.push(() => relay.stop());
+
+    // Connect then immediately disconnect, before the upstream connection settles.
+    const conn = await Bun.connect({
+      hostname: '127.0.0.1', port: relay.port,
+      socket: { data() {}, open(s) { s.end(); } },
+    });
+    conn.end();
+
+    await Bun.sleep(120);
+
+    // No lingering relay pairs, and any upstream that did connect was closed.
+    expect(relay.activeConnectionCount).toBe(0);
+    expect(relay.countConnectionsTo(slow.port)).toBe(0);
+    expect(upstreamClosed).toBe(upstreamOpened);
+  });
+
   it('reports active connection counts per upstream', async () => {
     const a = startEcho('A');
     cleanups.push(() => a.stop(true));
