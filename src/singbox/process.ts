@@ -1,4 +1,4 @@
-import { writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Node } from '../types.ts';
@@ -6,19 +6,19 @@ import { buildConfig } from './config.ts';
 
 export class SingBoxProcess {
   private proc: ReturnType<typeof Bun.spawn> | null = null;
-  private configPath: string | null = null;
+  private readonly configPath: string;
 
   constructor(
     private readonly binPath: string,
     private readonly basePort: number,
-  ) {}
+  ) {
+    this.configPath = join(tmpdir(), 'singbox-config.json');
+  }
 
   async start(nodes: Node[]): Promise<Map<string, number>> {
     const { config, portMap } = buildConfig(nodes, this.basePort);
 
-    // Write config to temp file
-    const dir = await mkdtemp(join(tmpdir(), 'singbox-'));
-    this.configPath = join(dir, 'config.json');
+    // Overwrite fixed config file
     await writeFile(this.configPath, JSON.stringify(config, null, 2));
 
     this.proc = Bun.spawn([this.binPath, 'run', '-c', this.configPath], {
@@ -63,12 +63,6 @@ export class SingBoxProcess {
       this.proc.kill();
       await this.proc.exited;
       this.proc = null;
-    }
-    // Clean up temp config directory to prevent disk leak
-    if (this.configPath) {
-      const dir = join(this.configPath, '..');
-      await rm(dir, { recursive: true, force: true });
-      this.configPath = null;
     }
   }
 }

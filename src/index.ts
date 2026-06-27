@@ -68,6 +68,16 @@ async function main() {
     await singbox.stop();
   });
 
+  // Graceful shutdown: clean up sing-box temp files on process exit
+  const shutdown = async (signal: string) => {
+    console.log(`[shutdown] received ${signal}, cleaning up...`);
+    monitor.stop();
+    await singbox.stop();
+    process.exit(0);
+  };
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+
   app.listen(3000);
   console.log(`[api] Listening on http://localhost:3000`);
 }
