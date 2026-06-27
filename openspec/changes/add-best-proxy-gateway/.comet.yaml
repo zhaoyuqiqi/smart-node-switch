@@ -1,5 +1,5 @@
 workflow: full
-phase: design
+phase: build
 context_compression: off
 build_mode: null
 build_pause: null
@@ -10,7 +10,7 @@ isolation: null
 verify_mode: null
 auto_transition: true
 base_ref: 55c9c740142ad06b6a4ce4edaf3420f81da0afed
-design_doc: null
+design_doc: docs/superpowers/specs/2026-06-27-best-proxy-gateway-design.md
 plan: null
 verify_result: pending
 verification_report: null
@@ -18,3 +18,5 @@ branch_status: pending
 created_at: 2026-06-27
 verified_at: null
 archived: false
+handoff_context: openspec/changes/add-best-proxy-gateway/.comet/handoff/design-context.json
+handoff_hash: 347b8634fcef91661d2545939d4b0322d42dddf211d30e3dfcb659e6309bd5b9

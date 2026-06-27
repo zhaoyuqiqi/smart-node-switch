@@ -1,0 +1,15 @@
+{
+  "change": "add-best-proxy-gateway",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "347b8634fcef91661d2545939d4b0322d42dddf211d30e3dfcb659e6309bd5b9",
+  "files": [
+    { "path": "openspec/changes/add-best-proxy-gateway/proposal.md", "sha256": "a9aff1b311faa82409ca7b8da1a3a56ab6e476d7db22122ca3d7a0318cba3015" },
+    { "path": "openspec/changes/add-best-proxy-gateway/design.md", "sha256": "eee96ed76dce0cee5831d66e203459e293344ee618a47b31f167eaa3b3a3be24" },
+    { "path": "openspec/changes/add-best-proxy-gateway/tasks.md", "sha256": "58c0e0c3ebfb68eb57225f0e980d745c2a1c45a8a0fa633d2cbc9bded30d951e" },
+    { "path": "openspec/changes/add-best-proxy-gateway/specs/best-proxy-gateway/spec.md", "sha256": "6024cc6a72378aa8b85ba15e1bcca718439b58e55bc36b9e09c00fa42f0cf18c" },
+    { "path": "openspec/changes/add-best-proxy-gateway/specs/node-health-monitor/spec.md", "sha256": "4b1425294409a3d03f46bd4a7ab7eb0181723f4bdb39d233166cb655ddbb54ec" }
+  ]
+}
