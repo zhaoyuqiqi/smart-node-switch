@@ -57,7 +57,7 @@ describe('loadConfig', () => {
     expect(cfg.nodeTtlSeconds).toBe(172800);
     expect(cfg.deathThreshold).toBe(20);
     expect(cfg.revivalSeconds).toBe(86400);
-    expect(cfg.testUrl).toBe('http://www.gstatic.com/generate_204');
+    expect(cfg.testUrl).toBe('https://www.google.com');
     expect(cfg.probeTimeoutMs).toBe(5000);
     expect(cfg.singboxBasePort).toBe(30000);
     expect(cfg.singboxBin).toBe('src/sing-box/sing-box');

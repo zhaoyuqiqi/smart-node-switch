@@ -40,7 +40,7 @@ bun install
 | `NODE_TTL_SECONDS` | `172800` | Redis 节点状态 TTL（默认 2 天） |
 | `DEATH_THRESHOLD` | `20` | 连续失败多少次标记为死亡 |
 | `REVIVAL_SECONDS` | `86400` | 死亡节点复活时长（默认 24h） |
-| `TEST_URL` | `http://www.gstatic.com/generate_204` | 探测目标 URL |
+| `TEST_URL` | `https://www.google.com` | 探测目标 URL |
 | `PROBE_TIMEOUT_MS` | `5000` | 单次探测超时（毫秒） |
 | `SINGBOX_BASE_PORT` | `30000` | sing-box 本地 inbound 起始端口 |
 | `SINGBOX_BIN` | `src/sing-box/sing-box` | sing-box 二进制路径 |
@@ -179,8 +179,8 @@ proxy = info["proxy"]                # 例如 "http://your-host:8080"
 assert proxy, "当前无可用节点"
 
 proxies = {"http": proxy, "https": proxy}
-resp = requests.get("http://www.gstatic.com/generate_204", proxies=proxies)
-print(resp.status_code)              # 预期 204
+resp = requests.get("https://www.google.com", proxies=proxies)
+print(resp.status_code)              # 预期 200
 ```
 
 仅用标准库 `urllib`：
@@ -193,7 +193,7 @@ proxy = __import__("json").loads(info)["proxy"]   # 例如 "http://your-host:808
 
 handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
 opener = urllib.request.build_opener(handler)
-print(opener.open("http://www.gstatic.com/generate_204").status)   # 预期 204
+print(opener.open("https://www.google.com").status)   # 预期 200
 ```
 
 ## Docker 部署
@@ -240,7 +240,7 @@ SUBSCRIPTION_URL=... REDIS_URL=redis://127.0.0.1:6379 bun run src/index.ts
      p=os.environ['P']; \
      h={'http':p,'https':p}; \
      o=urllib.request.build_opener(urllib.request.ProxyHandler(h)); \
-     print(o.open('http://www.gstatic.com/generate_204').status)" P="$PROXY"
+     print(o.open('https://www.google.com').status)" P="$PROXY"
    ```
 
    预期打印 `204`。
@@ -249,7 +249,7 @@ SUBSCRIPTION_URL=... REDIS_URL=redis://127.0.0.1:6379 bun run src/index.ts
 
    ```bash
    while true; do \
-     curl -s -x "$PROXY" http://www.gstatic.com/generate_204 -o /dev/null -w "%{http_code}\n"; \
+     curl -s -x "$PROXY" https://www.google.com -o /dev/null -w "%{http_code}\n"; \
      sleep 1; \
    done
    ```

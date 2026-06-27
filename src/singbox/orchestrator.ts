@@ -59,8 +59,8 @@ export class InstanceOrchestrator {
     }
 
     this._active = next;
-    this.params.onActiveChange?.(next);
     this.params.relay.setUpstream(next.proxyInboundPort);
+    this.params.onActiveChange?.(next);
 
     // Graceful drain of the old instance in the background.
     void this.drainAndStop(old);

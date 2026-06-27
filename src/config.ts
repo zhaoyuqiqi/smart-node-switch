@@ -15,7 +15,7 @@ export function loadConfig(): Config {
     nodeTtlSeconds: Number(process.env['NODE_TTL_SECONDS'] ?? 172800),
     deathThreshold: Number(process.env['DEATH_THRESHOLD'] ?? 20),
     revivalSeconds: Number(process.env['REVIVAL_SECONDS'] ?? 86400),
-    testUrl: process.env['TEST_URL'] ?? 'http://www.gstatic.com/generate_204',
+    testUrl: process.env['TEST_URL'] ?? 'https://www.google.com',
     probeTimeoutMs: Number(process.env['PROBE_TIMEOUT_MS'] ?? 5000),
     singboxBasePort: Number(process.env['SINGBOX_BASE_PORT'] ?? 30000),
     singboxBin: process.env['SINGBOX_BIN'] ?? 'src/sing-box/sing-box',

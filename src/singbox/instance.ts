@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Node } from '../types.ts';
@@ -132,5 +132,7 @@ export class SingBoxInstance {
       await this.proc.exited;
       this.proc = null;
     }
+    // Clean up config file to prevent disk accumulation on long-running instances.
+    await rm(this.configPath, { force: true });
   }
 }

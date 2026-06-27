@@ -14,7 +14,7 @@ describe('probe', () => {
     ) as unknown as typeof fetch;
 
     const { probe } = await import('./probe.ts');
-    const result = await probe(30000, 'http://www.gstatic.com/generate_204', 5000);
+    const result = await probe(30000, 'https://www.google.com', 5000);
 
     expect(result.ok).toBe(true);
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
@@ -27,7 +27,7 @@ describe('probe', () => {
     global.fetch = mock(() => Promise.reject(new Error('connection refused'))) as unknown as typeof fetch;
 
     const { probe } = await import('./probe.ts');
-    const result = await probe(30001, 'http://www.gstatic.com/generate_204', 5000);
+    const result = await probe(30001, 'https://www.google.com', 5000);
 
     expect(result.ok).toBe(false);
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
