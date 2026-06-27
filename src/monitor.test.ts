@@ -264,6 +264,23 @@ describe('Monitor blue-green trigger', () => {
     expect(swapArg!.map((n) => n.key).sort()).toEqual(['x0', 'x1', 'x2', 'x3']);
   });
 
+  it('keeps the old node set when blueGreenSwap fails', async () => {
+    const store = new MemoryStateStore();
+    const oldNodes = Array.from({ length: 4 }, (_, i) => makeNode(`o${i}`));
+    const newNodes = Array.from({ length: 4 }, (_, i) => makeNode(`x${i}`));
+    const orchestrator = { async blueGreenSwap() { return false; } };
+    const monitor = new Monitor({
+      store, probe: async () => ({ ok: false, latencyMs: 5000 }),
+      refresh: async () => newNodes, nodes: oldNodes, portMap: makePortMap(oldNodes),
+      intervalSeconds: 9999, maxConcurrency: 10, refreshThreshold: 0.1, refreshCooldownSeconds: 0,
+      nodeTtlSeconds: 1000, deathThreshold: 100, revivalSeconds: 1000,
+      testUrl: 't', probeTimeoutMs: 100, orchestrator,
+    });
+    await monitor.runRound();
+    // Swap failed → monitor must stay consistent with the still-running old instance.
+    expect(monitor.getNodes().map((n) => n.key).sort()).toEqual(['o0', 'o1', 'o2', 'o3']);
+  });
+
   it('does not swap when the refreshed node set is identical', async () => {
     const store = new MemoryStateStore();
     const nodes = Array.from({ length: 4 }, (_, i) => makeNode(`s${i}`));

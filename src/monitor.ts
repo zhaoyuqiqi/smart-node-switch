@@ -40,10 +40,9 @@ export class Monitor {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastRefreshAt = Date.now() / 1000; // initialize to now so first check respects cooldown
   private readonly queue: PQueue;
-  private currentBestKey: string | null = null;
   private lastSelector: string | null = null;
 
-  constructor(private readonly opts: MonitorOptions) {
+  constructor(private opts: MonitorOptions) {
     this.nodes = opts.nodes;
     this.portMap = opts.portMap;
     this.queue = new PQueue({ concurrency: opts.maxConcurrency });
@@ -52,6 +51,10 @@ export class Monitor {
   updateNodes(nodes: Node[], portMap: Map<string, number>) {
     this.nodes = nodes;
     this.portMap = portMap;
+  }
+
+  setOrchestrator(o: { blueGreenSwap(newNodes: Node[]): Promise<boolean> }) {
+    this.opts.orchestrator = o;
   }
 
   async start() {
@@ -173,7 +176,6 @@ export class Monitor {
     const target = bestKey ? `out-${bestKey}` : "block";
     if (target === this.lastSelector) return;
     this.lastSelector = target;
-    this.currentBestKey = bestKey;
     try {
       await clash.setSelector(target);
     } catch (e) {
@@ -204,13 +206,22 @@ export class Monitor {
       this.lastRefreshAt = nowSec;
       const newNodes = await refresh();
       const changed = !this.sameNodeSet(this.nodes, newNodes);
-      this.nodes = newNodes;
       if (changed && this.opts.orchestrator) {
         const ok = await this.opts.orchestrator.blueGreenSwap(newNodes);
-        if (!ok)
+        if (ok) {
+          // Swap succeeded: adopt the new node set. onActiveChange has already
+          // re-pointed portMap at the new instance.
+          this.nodes = newNodes;
+        } else {
+          // Swap failed: old instance kept running, so keep the previous node
+          // set and portMap to stay consistent with the live instance.
           console.error(
             "[monitor] blueGreenSwap failed; keeping old instance"
           );
+        }
+      } else {
+        // No orchestrator (or unchanged set): adopt newNodes directly.
+        this.nodes = newNodes;
       }
       // After refresh, run another round immediately (skip nested refresh check)
       await this.runRound(true);
