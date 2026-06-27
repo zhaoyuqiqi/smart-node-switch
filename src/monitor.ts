@@ -2,6 +2,7 @@ import PQueue from "p-queue";
 import type { Node, NodeState } from "./types.ts";
 import type { StateStore } from "./store/state-store.ts";
 import type { ProbeResult } from "./singbox/probe.ts";
+import { score } from "./scoring.ts";
 
 export type ProbeFn = (
   port: number,
@@ -25,6 +26,12 @@ export interface MonitorOptions {
   revivalSeconds: number;
   testUrl: string;
   probeTimeoutMs: number;
+  clash?: { setSelector(outboundTag: string): Promise<void> };
+  orchestrator?: { blueGreenSwap(newNodes: Node[]): Promise<boolean> };
+  onActiveInstance?: (
+    portMap: Map<string, number>,
+    clash: { setSelector(t: string): Promise<void> }
+  ) => void;
 }
 
 export class Monitor {
@@ -33,6 +40,8 @@ export class Monitor {
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastRefreshAt = Date.now() / 1000; // initialize to now so first check respects cooldown
   private readonly queue: PQueue;
+  private currentBestKey: string | null = null;
+  private lastSelector: string | null = null;
 
   constructor(private readonly opts: MonitorOptions) {
     this.nodes = opts.nodes;
@@ -131,9 +140,44 @@ export class Monitor {
 
     await this.queue.addAll(checkTasks);
 
+    await this.applyBestSelector();
+
     // Evaluate refresh threshold (skip when already triggered by a refresh)
     if (!skipRefreshCheck) {
       await this.maybeRefresh();
+    }
+  }
+
+  private async computeBestKey(): Promise<string | null> {
+    const { store } = this.opts;
+    const now = Date.now();
+    let bestKey: string | null = null;
+    let bestScore = Infinity;
+    for (const node of this.nodes) {
+      if (await store.isDead(node.key)) continue;
+      const state = await store.getState(node.key);
+      if (!state || state.lastCheck === 0 || state.failCount !== 0) continue;
+      const s = score(state, now);
+      if (s < bestScore) {
+        bestScore = s;
+        bestKey = node.key;
+      }
+    }
+    return bestKey;
+  }
+
+  private async applyBestSelector(): Promise<void> {
+    const clash = this.opts.clash;
+    if (!clash) return;
+    const bestKey = await this.computeBestKey();
+    const target = bestKey ? `out-${bestKey}` : "block";
+    if (target === this.lastSelector) return;
+    this.lastSelector = target;
+    this.currentBestKey = bestKey;
+    try {
+      await clash.setSelector(target);
+    } catch (e) {
+      console.error("[monitor] setSelector failed", e);
     }
   }
 
@@ -159,10 +203,25 @@ export class Monitor {
     if (available < total * refreshThreshold) {
       this.lastRefreshAt = nowSec;
       const newNodes = await refresh();
+      const changed = !this.sameNodeSet(this.nodes, newNodes);
       this.nodes = newNodes;
+      if (changed && this.opts.orchestrator) {
+        const ok = await this.opts.orchestrator.blueGreenSwap(newNodes);
+        if (!ok)
+          console.error(
+            "[monitor] blueGreenSwap failed; keeping old instance"
+          );
+      }
       // After refresh, run another round immediately (skip nested refresh check)
       await this.runRound(true);
     }
+  }
+
+  private sameNodeSet(a: Node[], b: Node[]): boolean {
+    if (a.length !== b.length) return false;
+    const sa = new Set(a.map((n) => n.key));
+    for (const n of b) if (!sa.has(n.key)) return false;
+    return true;
   }
 
   getNodes(): Node[] {
