@@ -60,3 +60,41 @@ describe('GET /nodes/best raw+originalUri', () => {
     expect(body.best.originalUri).toBe('trojan://pw-bbb@h.com:443#N-bbb');
   });
 });
+
+describe('GET /proxy', () => {
+  it('returns the fixed proxy address and best node when a node is available', async () => {
+    const node = makeNode('best1');
+    const app = registerRoutes(
+      new Elysia(), fakeMonitor([node]), fakeStore({ best1: makeState({ latency: 5 }) }),
+      { publicHost: 'gw.example.com', port: 8080 },
+    );
+    const body = await getJson(app, '/proxy');
+    expect(body.proxy).toBe('http://gw.example.com:8080');
+    expect(body.node.key).toBe('best1');
+    expect(body.node.raw.password).toBe('pw-best1');
+    expect(body.node.originalUri).toBe('trojan://pw-best1@h.com:443#N-best1');
+  });
+
+  it('returns nulls when no node is available', async () => {
+    const node = makeNode('dead1');
+    const app = registerRoutes(
+      new Elysia(), fakeMonitor([node]),
+      fakeStore({ dead1: makeState({ failCount: 3 }) }), // failCount!=0 -> unavailable
+      { publicHost: 'gw.example.com', port: 8080 },
+    );
+    const body = await getJson(app, '/proxy');
+    expect(body.proxy).toBeNull();
+    expect(body.node).toBeNull();
+  });
+
+  it('falls back to the request Host when publicHost is empty', async () => {
+    const node = makeNode('best2');
+    const app = registerRoutes(
+      new Elysia(), fakeMonitor([node]), fakeStore({ best2: makeState() }),
+      { publicHost: '', port: 9000 },
+    );
+    const res = await app.handle(new Request('http://my-host:1234/proxy'));
+    const body = await res.json() as any;
+    expect(body.proxy).toBe('http://my-host:9000');
+  });
+});
