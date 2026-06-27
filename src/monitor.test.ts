@@ -31,7 +31,7 @@ class MemoryStateStore implements StateStore {
 
 // ---- Test fixtures ----
 function makeNode(key: string): Node {
-  return { key, name: `Node-${key}`, protocol: 'trojan', server: 'h.com', port: 443, raw: {} };
+  return { key, name: `Node-${key}`, protocol: 'trojan', server: 'h.com', port: 443, raw: {}, originalUri: '' };
 }
 
 function makePortMap(nodes: Node[], basePort = 30000): Map<string, number> {
