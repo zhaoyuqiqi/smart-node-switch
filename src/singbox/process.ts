@@ -16,7 +16,13 @@ export class SingBoxProcess {
   }
 
   async start(nodes: Node[]): Promise<Map<string, number>> {
-    const { config, portMap } = buildConfig(nodes, this.basePort);
+    const { config, portMap } = await buildConfig({
+      nodes,
+      basePort: this.basePort,
+      proxyInboundOffset: 0,
+      clashPort: this.basePort + 9000,
+      clashSecret: 'legacy',
+    });
 
     // Overwrite fixed config file
     await writeFile(this.configPath, JSON.stringify(config, null, 2));
