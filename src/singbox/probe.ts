@@ -14,6 +14,8 @@ export async function probe(port: number, testUrl: string, timeoutMs: number): P
       proxy: `http://127.0.0.1:${port}`,
       signal: AbortSignal.timeout(timeoutMs),
     } as RequestInit);
+    // Drain body to release the underlying TCP connection back to the pool.
+    await res.body?.cancel();
     const latencyMs = Date.now() - start;
     const ok = res.status > 0 && res.status < 400;
     if (!ok) {

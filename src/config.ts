@@ -1,5 +1,8 @@
 import type { Config } from './types.ts';
 
+// Generated once per process; stable across multiple loadConfig() calls.
+const DEFAULT_CLASH_SECRET = crypto.randomUUID().replace(/-/g, '');
+
 export function loadConfig(): Config {
   const subscriptionUrl = process.env['SUBSCRIPTION_URL'];
   if (!subscriptionUrl) {
@@ -24,8 +27,7 @@ export function loadConfig(): Config {
     proxyBindAddress: process.env['PROXY_BIND_ADDRESS'] ?? '0.0.0.0',
     proxyPublicHost: process.env['PROXY_PUBLIC_HOST'] ?? '',
     clashApiBasePort: Number(process.env['CLASH_API_BASE_PORT'] ?? 9090),
-    clashApiSecret:
-      process.env['CLASH_API_SECRET'] ?? crypto.randomUUID().replace(/-/g, ''),
+    clashApiSecret: process.env['CLASH_API_SECRET'] ?? DEFAULT_CLASH_SECRET,
     singboxInstancePortStride: Number(process.env['SINGBOX_INSTANCE_PORT_STRIDE'] ?? 1000),
     singboxProxyInboundOffset: Number(process.env['SINGBOX_PROXY_INBOUND_OFFSET'] ?? 0),
     maxDrainSeconds: Number(process.env['MAX_DRAIN_SECONDS'] ?? 300),

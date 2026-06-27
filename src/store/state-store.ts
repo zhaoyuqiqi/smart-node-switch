@@ -35,7 +35,8 @@ export class RedisStateStore implements StateStore {
 
   async setState(key: string, state: NodeState, ttlSeconds: number): Promise<void> {
     const sk = stateKey(key);
-    await this.redis.hset(sk, {
+    const pipeline = this.redis.pipeline();
+    pipeline.hset(sk, {
       latency: String(state.latency),
       failCount: String(state.failCount),
       successCount: String(state.successCount),
@@ -45,7 +46,8 @@ export class RedisStateStore implements StateStore {
       server: state.server,
       port: String(state.port),
     });
-    await this.redis.expire(sk, ttlSeconds);
+    pipeline.expire(sk, ttlSeconds);
+    await pipeline.exec();
   }
 
   async renewTtl(key: string, ttlSeconds: number): Promise<void> {

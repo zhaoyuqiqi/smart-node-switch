@@ -107,15 +107,14 @@ async function main() {
     await orchestrator.active.stop();
   });
 
-  const shutdown = async (signal: string) => {
-    console.log(`[shutdown] received ${signal}, cleaning up...`);
-    monitor.stop();
-    relay.stop();
-    await orchestrator.active.stop();
-    process.exit(0);
-  };
-  process.on('SIGINT', () => void shutdown('SIGINT'));
-  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => {
+    console.log('[shutdown] received SIGINT, cleaning up...');
+    void app.stop();
+  });
+  process.on('SIGTERM', () => {
+    console.log('[shutdown] received SIGTERM, cleaning up...');
+    void app.stop();
+  });
 
   app.listen(3000);
   console.log(`[api] Listening on http://localhost:3000`);

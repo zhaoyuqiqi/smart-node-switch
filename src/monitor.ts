@@ -41,6 +41,8 @@ export class Monitor {
   private lastRefreshAt = Date.now() / 1000; // initialize to now so first check respects cooldown
   private readonly queue: PQueue;
   private lastSelector: string | null = null;
+  private stopped = false;
+  private isRunning = false;
 
   constructor(private opts: MonitorOptions) {
     this.nodes = opts.nodes;
@@ -65,6 +67,7 @@ export class Monitor {
   }
 
   stop() {
+    this.stopped = true;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
@@ -73,6 +76,17 @@ export class Monitor {
   }
 
   async runRound(skipRefreshCheck = false): Promise<void> {
+    if (this.stopped) return;
+    if (this.isRunning && !skipRefreshCheck) return; // prevent timer re-entry
+    this.isRunning = true;
+    try {
+      await this._runRound(skipRefreshCheck);
+    } finally {
+      this.isRunning = false;
+    }
+  }
+
+  private async _runRound(skipRefreshCheck = false): Promise<void> {
     const {
       store,
       probe,
@@ -82,7 +96,6 @@ export class Monitor {
       deathThreshold,
       revivalSeconds,
     } = this.opts;
-    const now = Date.now();
 
     console.log(
       `[monitor] runRound: ${this.nodes.length} nodes, portMap size=${this.portMap.size}`
@@ -125,7 +138,13 @@ export class Monitor {
       };
 
       if (result.ok) {
-        state.latency = result.latencyMs;
+        // EMA smoothing: blend new sample with historical latency to reduce
+        // the impact of one-off slow requests on scoring.
+        // alpha=0.2 means new sample contributes 20%, history 80%.
+        const EMA_ALPHA = 0.2;
+        state.latency = existing?.latency
+          ? Math.round(existing.latency * (1 - EMA_ALPHA) + result.latencyMs * EMA_ALPHA)
+          : result.latencyMs;
         state.failCount = 0;
         state.successCount++;
       } else {
@@ -142,8 +161,10 @@ export class Monitor {
     });
 
     await this.queue.addAll(checkTasks);
+    if (this.stopped) return;
 
     await this.applyBestSelector();
+    if (this.stopped) return;
 
     // Evaluate refresh threshold (skip when already triggered by a refresh)
     if (!skipRefreshCheck) {
