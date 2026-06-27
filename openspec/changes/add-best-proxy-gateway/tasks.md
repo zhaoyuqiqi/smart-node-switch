@@ -1,16 +1,16 @@
 ## 1. 配置与类型
 
-- [ ] 1.1 config 新增:PROXY_PORT、proxyBindAddress、Clash API 端口/secret、sing-box 蓝绿两套实例端口段、relay 排空策略/超时(含单测)
-- [ ] 1.2 类型扩展:`Node` 增加 `originalUri`;`NodeView` 增加 `raw` 与 `originalUri`
+- [x] 1.1 config 新增:PROXY_PORT、proxyBindAddress、Clash API 端口/secret、sing-box 蓝绿两套实例端口段、relay 排空策略/超时(含单测)
+- [x] 1.2 类型扩展:`Node` 增加 `originalUri`;`NodeView` 增加 `raw` 与 `originalUri`
 
 ## 2. Req1 节点信息补全
 
-- [ ] 2.1 解析器在 `Node` 上保存 `originalUri`(四协议,含单测)
-- [ ] 2.2 `api.ts` 的 `/nodes` 与 `/nodes/best` 返回补全 raw + originalUri(含单测)
+- [x] 2.1 解析器在 `Node` 上保存 `originalUri`(四协议,含单测)
+- [x] 2.2 `api.ts` 的 `/nodes` 与 `/nodes/best` 返回补全 raw + originalUri(含单测)
 
 ## 3. Req2 端口跳过
 
-- [ ] 3.1 实现端口可用性探测(尝试绑定 127.0.0.1:port,占用则跳过)（含单测）
+- [x] 3.1 实现端口可用性探测(尝试绑定 127.0.0.1:port,占用则跳过)（含单测）
 - [ ] 3.2 `buildConfig` 端口分配改为按可用性分配,跳过占用端口、记录实际 portMap;支持避开排除端口集(蓝绿用)（含单测）
 - [ ] 3.3 sing-box 启动失败(端口竞争)时回退重试下一段端口
 
