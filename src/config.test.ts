@@ -5,9 +5,27 @@ import { nodeKey } from './types.ts';
 describe('loadConfig', () => {
   const originalEnv = process.env;
 
+  const CONFIG_ENV_KEYS = [
+    'SUBSCRIPTION_URL',
+    'CHECK_INTERVAL_SECONDS',
+    'MAX_CONCURRENCY',
+    'REFRESH_THRESHOLD',
+    'REFRESH_COOLDOWN_SECONDS',
+    'NODE_TTL_SECONDS',
+    'DEATH_THRESHOLD',
+    'REVIVAL_SECONDS',
+    'TEST_URL',
+    'PROBE_TIMEOUT_MS',
+    'SINGBOX_BASE_PORT',
+    'SINGBOX_BIN',
+    'REDIS_URL',
+  ];
+
   beforeEach(() => {
+    // Start from a clean env so ambient values (e.g. an auto-loaded .env)
+    // don't leak into the defaults assertions. Each test sets only what it needs.
     process.env = { ...originalEnv };
-    delete process.env['SUBSCRIPTION_URL'];
+    for (const key of CONFIG_ENV_KEYS) delete process.env[key];
   });
 
   afterEach(() => {
@@ -25,9 +43,12 @@ describe('loadConfig', () => {
     expect(cfg.checkIntervalSeconds).toBe(30);
     expect(cfg.maxConcurrency).toBe(10);
     expect(cfg.refreshThreshold).toBe(0.1);
+    expect(cfg.refreshCooldownSeconds).toBe(300);
     expect(cfg.nodeTtlSeconds).toBe(172800);
     expect(cfg.deathThreshold).toBe(20);
     expect(cfg.revivalSeconds).toBe(86400);
+    expect(cfg.testUrl).toBe('http://www.gstatic.com/generate_204');
+    expect(cfg.probeTimeoutMs).toBe(5000);
     expect(cfg.singboxBasePort).toBe(30000);
     expect(cfg.singboxBin).toBe('src/sing-box/sing-box');
     expect(cfg.redisUrl).toBe('redis://127.0.0.1:6379');
