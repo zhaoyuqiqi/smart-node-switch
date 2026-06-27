@@ -9,7 +9,7 @@ export function toOutbound(node: Node): Record<string, unknown> {
   switch (node.protocol) {
     case 'trojan': {
       const raw = node.raw;
-      return {
+      const out: Record<string, unknown> = {
         type: 'trojan',
         tag,
         server: node.server,
@@ -19,8 +19,22 @@ export function toOutbound(node: Node): Record<string, unknown> {
           enabled: true,
           server_name: raw['sni'] ?? node.server,
           insecure: raw['allowInsecure'] === true,
+          ...(raw['fp'] ? { utls: { enabled: true, fingerprint: raw['fp'] } } : {}),
         },
       };
+
+      // WebSocket transport
+      if (raw['type'] === 'ws') {
+        out['transport'] = {
+          type: 'ws',
+          path: raw['path'] || '/',
+          headers: raw['host'] ? { Host: raw['host'] } : undefined,
+        };
+      } else if (raw['type'] === 'grpc') {
+        out['transport'] = { type: 'grpc' };
+      }
+
+      return out;
     }
 
     case 'vmess': {

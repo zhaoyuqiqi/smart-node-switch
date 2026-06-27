@@ -1,9 +1,13 @@
-import PQueue from 'p-queue';
-import type { Node, NodeState } from './types.ts';
-import type { StateStore } from './store/state-store.ts';
-import type { ProbeResult } from './singbox/probe.ts';
+import PQueue from "p-queue";
+import type { Node, NodeState } from "./types.ts";
+import type { StateStore } from "./store/state-store.ts";
+import type { ProbeResult } from "./singbox/probe.ts";
 
-export type ProbeFn = (port: number, testUrl: string, timeoutMs: number) => Promise<ProbeResult>;
+export type ProbeFn = (
+  port: number,
+  testUrl: string,
+  timeoutMs: number
+) => Promise<ProbeResult>;
 export type RefreshFn = () => Promise<Node[]>;
 
 export interface MonitorOptions {
@@ -57,17 +61,44 @@ export class Monitor {
   }
 
   async runRound(skipRefreshCheck = false): Promise<void> {
-    const { store, probe, testUrl, probeTimeoutMs, nodeTtlSeconds, deathThreshold, revivalSeconds } = this.opts;
+    const {
+      store,
+      probe,
+      testUrl,
+      probeTimeoutMs,
+      nodeTtlSeconds,
+      deathThreshold,
+      revivalSeconds,
+    } = this.opts;
     const now = Date.now();
 
-    const checkTasks = this.nodes.map(node => async () => {
+    console.log(
+      `[monitor] runRound: ${this.nodes.length} nodes, portMap size=${this.portMap.size}`
+    );
+
+    const checkTasks = this.nodes.map((node) => async () => {
       // Skip dead nodes
-      if (await store.isDead(node.key)) return;
+      if (await store.isDead(node.key)) {
+        console.log(`[monitor] skip dead: ${node.name}`);
+        return;
+      }
 
       const port = this.portMap.get(node.key);
-      if (port === undefined) return;
+      if (port === undefined) {
+        console.log(`[monitor] no port for: ${node.name} (key=${node.key})`);
+        return;
+      }
 
       const result = await probe(port, testUrl, probeTimeoutMs);
+      if (result.ok) {
+        console.log(
+          `[monitor] ✅ AVAILABLE: ${node.server} ${node.name} port=${port} latency=${result.latencyMs}ms`
+        );
+      } else {
+        console.log(
+          `[monitor] ❌ failed: ${node.server} ${node.name} port=${port} latency=${result.latencyMs}ms`
+        );
+      }
       const existing = await store.getState(node.key);
 
       const state: NodeState = {
@@ -107,7 +138,8 @@ export class Monitor {
   }
 
   private async maybeRefresh(): Promise<void> {
-    const { store, refresh, refreshThreshold, refreshCooldownSeconds } = this.opts;
+    const { store, refresh, refreshThreshold, refreshCooldownSeconds } =
+      this.opts;
     const total = this.nodes.length;
     if (total === 0) return;
 

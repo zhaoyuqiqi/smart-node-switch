@@ -30,8 +30,6 @@ export class RedisStateStore implements StateStore {
   async getState(key: string): Promise<NodeState | null> {
     const hash = await this.redis.hgetall(stateKey(key));
     if (!hash || Object.keys(hash).length === 0) return null;
-    // Renew TTL on read
-    await this.redis.expire(stateKey(key), 172800);
     return parseState(hash);
   }
 

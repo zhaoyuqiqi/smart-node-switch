@@ -15,8 +15,14 @@ export async function probe(port: number, testUrl: string, timeoutMs: number): P
       signal: AbortSignal.timeout(timeoutMs),
     } as RequestInit);
     const latencyMs = Date.now() - start;
-    return { ok: res.status > 0 && res.status < 400, latencyMs };
-  } catch {
-    return { ok: false, latencyMs: Date.now() - start };
+    const ok = res.status > 0 && res.status < 400;
+    if (!ok) {
+      console.log(`[probe] port=${port} status=${res.status} (not ok)`);
+    }
+    return { ok, latencyMs };
+  } catch (err) {
+    const latencyMs = Date.now() - start;
+    console.log(`[probe] port=${port} error: ${(err as Error)?.message ?? err}`);
+    return { ok: false, latencyMs };
   }
 }
