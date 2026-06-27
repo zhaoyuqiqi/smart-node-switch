@@ -12,20 +12,20 @@
 
 - [x] 3.1 实现端口可用性探测(尝试绑定 127.0.0.1:port,占用则跳过)（含单测）
 - [x] 3.2 `buildConfig` 端口分配改为按可用性分配,跳过占用端口、记录实际 portMap;支持避开排除端口集(蓝绿用)（含单测）
-- [ ] 3.3 sing-box 启动失败(端口竞争)时回退重试下一段端口
+- [x] 3.3 sing-box 启动失败(端口竞争)时回退重试下一段端口
 
 ## 4. Req3 转发代理(selector + Clash API)
 
 - [x] 4.1 `buildConfig` 增加固定 proxy 入站(mixed,bind 可配)+ selector 出站(成员=全部节点 outbound,`interrupt_exist_connections: false`)+ route 规则 + 启用 clash_api(含单测)
 - [x] 4.2 实现 Clash API 客户端:把 selector 切到指定 outbound(含单测,可对 mock HTTP)
-- [ ] 4.3 monitor 在 best 变化时调用 Clash API 热切 selector(不重启)（含单测,mock clash 客户端）
+- [x] 4.3 monitor 在 best 变化时调用 Clash API 热切 selector(不重启)（含单测,mock clash 客户端）
 
 ## 5. Req3-HA TCP relay + 蓝绿双实例
 
 - [x] 5.1 实现常驻 Bun TCP relay:监听对外 PROXY_PORT,透明转发到当前活跃上游端口,支持原子切换上游;切换时保留已建立连接、仅新连接走新上游(含单测,可用本地 echo TCP 服务)
-- [ ] 5.2 实现 sing-box 实例"就绪"探测(端口可连 / Clash API ready)
-- [ ] 5.3 蓝绿编排:节点集更新时起新实例→就绪→切 relay 上游→优雅排空(保留旧连接,达最大排空超时才硬关)→关闭旧实例(含单测,mock 实例与 relay)
-- [ ] 5.4 monitor 的订阅刷新接入蓝绿编排,替换原 restart 路径
+- [x] 5.2 实现 sing-box 实例"就绪"探测(端口可连 / Clash API ready)
+- [x] 5.3 蓝绿编排:节点集更新时起新实例→就绪→切 relay 上游→优雅排空(保留旧连接,达最大排空超时才硬关)→关闭旧实例(含单测,mock 实例与 relay)
+- [x] 5.4 monitor 的订阅刷新接入蓝绿编排,替换原 restart 路径
 
 ## 6. /proxy API 与装配
 

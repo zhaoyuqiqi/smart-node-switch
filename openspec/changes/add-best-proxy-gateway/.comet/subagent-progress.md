@@ -10,12 +10,16 @@
 
 ## 当前
 
-- 当前 task: Task 7（SingBoxInstance + 就绪 + TOCTOU 启动重试,修 process.ts;openspec 5.2+3.3）
+- 当前 task: Task 10（GET /proxy;openspec 6.1)
 - 阶段: implementing
-- task base commit: 48bc9d9
-- 已知:tsc 在 process.ts 暂红 → Task 7 必须修复使 tsc 全绿
-- Task 4 a008269 / Task 5 d04e69f / Task 6 48bc9d9(relay,95 pass)
-- batch[4-6]: APPROVED(spec ✅ / quality approved,仅 MINOR;0 轮修复)
+- task base commit: 8515a32
+- tsc 全绿;Task 9 已提交 8515a32(monitor 集成,110 pass,tsc 0)
+- batch[7-9]: APPROVED(仅 MINOR;0 轮修复)
+
+### Task 11 接线必做清单(batch[7-9] Cannot-Verify,强约束)
+- (CV1) 蓝绿 swap 成功后,monitor 的 portMap+clash 必须经 onActiveInstance 更新为新实例,否则蓝绿后 monitor 对新节点失明(no port for)。orchestrator.onActiveChange → monitor 更新 portMap/clash。
+- (CV3) monitor.maybeRefresh 在 blueGreenSwap 返回 false 时仍把 this.nodes=newNodes,与运行中旧实例不一致;Task 11 复核:swap 失败应回退 this.nodes 到旧集合。
+- (MINOR4 batch79) monitor.currentBestKey 死字段(真正去重是 lastSelector):删除或在接线时使用。
 - 注:implementer 因权限无法 commit/部分无法跑测试,协调者负责验证(tsc+bun test)后提交
 - 携带给 Task 4 的约束(batch[1-3] reviewer MINOR#1):sing-box inbounds 保持 listen 127.0.0.1,以匹配 isPortFree(127.0.0.1) 探测;对外 0.0.0.0 由 relay(Task 6) 负责
 
@@ -29,6 +33,7 @@
 
 - batch [1-3]: APPROVED (spec ✅ / quality approved, 仅 MINOR;0 轮修复)
 - batch [4-6]: APPROVED (spec ✅ / quality approved, 仅 MINOR;0 轮修复)
+- batch [7-9]: APPROVED (spec ✅ / quality approved, 仅 MINOR;0 轮修复)
 - batch [4-6]: pending
 - batch [7-9]: pending
 - batch [10-12]: pending
