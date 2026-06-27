@@ -2,6 +2,8 @@
 comet_change: add-node-health-monitor
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-27-add-node-health-monitor
+status: final
 ---
 
 # Node Health Monitor — 技术设计

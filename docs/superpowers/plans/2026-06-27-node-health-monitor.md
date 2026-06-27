@@ -2,6 +2,7 @@
 change: add-node-health-monitor
 design-doc: docs/superpowers/specs/2026-06-26-node-health-monitor-design.md
 base-ref: 6fa3e0d06e036349a461300986e875b964299e6b
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 # Node Health Monitor 实施计划
@@ -14,6 +15,7 @@ base-ref: 6fa3e0d06e036349a461300986e875b964299e6b
 
 任务按依赖顺序分 7 批执行，先基础模块后上层集成。
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 第 1 批：项目脚手架与配置（任务 1.1–1.3）
@@ -42,6 +44,7 @@ chmod +x src/sing-box/sing-box
 - `nodeKey(node: Omit<Node, 'key' | 'name'>): string`（sha1 前 16 位）
 - Redis key helper：`stateKey(key)`, `deadKey(key)`
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 第 2 批：订阅解析（任务 2.1–2.6）
@@ -74,6 +77,7 @@ chmod +x src/sing-box/sing-box
 - 分发到四个 parser，跳过 null/不支持，生成 nodeKey，去重
 - 含单测（base64 解码 + 跳过非法 + key 稳定性）
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 第 3 批：sing-box 代理编排（任务 3.1–3.3）
@@ -95,6 +99,7 @@ chmod +x src/sing-box/sing-box
 - 使用 Bun `fetch` 的 `proxy` 选项，超时用 `AbortSignal.timeout`
 - 含单测（mock fetch）
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 第 4 批：Redis 状态与评分（任务 4.1–4.4）
@@ -124,6 +129,7 @@ chmod +x src/sing-box/sing-box
 `dead:<key>` TTL = `revivalSeconds`（24h）；复活后再次失败立即重写 dead key
 - 含单测（状态转移：20次失败→dead，成功→复活，再失败→立即dead）
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 第 5 批：健康检查调度（任务 5.1–5.4）
@@ -151,6 +157,7 @@ chmod +x src/sing-box/sing-box
 `runRound()` 完成后：可用数 < 总数 * `refreshThreshold` 且满足 cooldown → `refreshSubscription()` → 重启 sing-box → 再 `runRound()`
 - 含单测（mock probe 编排成功/失败序列，验证 failCount、死亡、刷新触发）
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 第 6 批：Elysia API（任务 6.1–6.3）
@@ -170,6 +177,7 @@ chmod +x src/sing-box/sing-box
 
 返回 score 最低的 `NodeView`；无可用节点时返回 `{ best: null }`（HTTP 200）
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 第 7 批：集成与收尾（任务 7.1–7.2）
@@ -182,6 +190,7 @@ chmod +x src/sing-box/sing-box
 
 补充：运行方式、环境变量表、API 说明
 
+archived-with: 2026-06-27-add-node-health-monitor
 ---
 
 ## 技术约束

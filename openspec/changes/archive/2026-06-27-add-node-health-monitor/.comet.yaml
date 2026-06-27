@@ -1,5 +1,5 @@
 workflow: full
-phase: verify
+phase: archive
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -12,12 +12,12 @@ auto_transition: true
 base_ref: 6fa3e0d06e036349a461300986e875b964299e6b
 design_doc: docs/superpowers/specs/2026-06-26-node-health-monitor-design.md
 plan: docs/superpowers/plans/2026-06-27-node-health-monitor.md
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-06-27-add-node-health-monitor-verify.md
 branch_status: handled
 created_at: 2026-06-26
-verified_at: null
-archived: false
+verified_at: 2026-06-27
+archived: true
 handoff_context: openspec/changes/add-node-health-monitor/.comet/handoff/design-context.json
 handoff_hash: 2ba732969f1978e8b9323a616faa60fbffce0c1b54be7210016b8b0440ea7134
 build_command: bun run --bun tsc --noEmit
