@@ -5,6 +5,7 @@ export interface Node {
   server: string;
   port: number;
   raw: Record<string, unknown>;
+  originalUri: string;
 }
 
 export interface NodeState {
@@ -29,6 +30,8 @@ export interface NodeView {
   failCount: number;
   lastCheck: number;
   score: number;
+  raw: Record<string, unknown>;
+  originalUri: string;
 }
 
 export interface Config {
@@ -45,6 +48,15 @@ export interface Config {
   singboxBasePort: number;
   singboxBin: string;
   redisUrl: string;
+  proxyPort: number;
+  proxyBindAddress: string;
+  proxyPublicHost: string;
+  clashApiBasePort: number;
+  clashApiSecret: string;
+  singboxInstancePortStride: number;
+  singboxProxyInboundOffset: number;
+  maxDrainSeconds: number;
+  instanceReadyTimeoutMs: number;
 }
 
 // Redis key helpers

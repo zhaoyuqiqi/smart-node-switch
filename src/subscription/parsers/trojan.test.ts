@@ -40,4 +40,10 @@ describe('parseTrojan', () => {
     const b = parseTrojan('trojan://pass@b.com:443');
     expect(a!.key).not.toBe(b!.key);
   });
+
+  it('stores the original URI', () => {
+    const uri = 'trojan://pass@example.com:443#MyNode';
+    const node = parseTrojan(uri);
+    expect(node!.originalUri).toBe(uri);
+  });
 });

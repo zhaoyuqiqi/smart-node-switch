@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { loadConfig } from './config.ts';
 import { nodeKey } from './types.ts';
+import type { Node, NodeView } from './types.ts';
 
 describe('loadConfig', () => {
   const originalEnv = process.env;
@@ -19,6 +20,15 @@ describe('loadConfig', () => {
     'SINGBOX_BASE_PORT',
     'SINGBOX_BIN',
     'REDIS_URL',
+    'PROXY_PORT',
+    'PROXY_BIND_ADDRESS',
+    'PROXY_PUBLIC_HOST',
+    'CLASH_API_BASE_PORT',
+    'CLASH_API_SECRET',
+    'SINGBOX_INSTANCE_PORT_STRIDE',
+    'SINGBOX_PROXY_INBOUND_OFFSET',
+    'MAX_DRAIN_SECONDS',
+    'INSTANCE_READY_TIMEOUT_MS',
   ];
 
   beforeEach(() => {
@@ -64,6 +74,32 @@ describe('loadConfig', () => {
     expect(cfg.maxConcurrency).toBe(5);
     expect(cfg.deathThreshold).toBe(10);
   });
+
+  it('loads new proxy/clash defaults', () => {
+    process.env['SUBSCRIPTION_URL'] = 'https://example.com/sub';
+    const cfg = loadConfig();
+    expect(cfg.proxyPort).toBe(8080);
+    expect(cfg.proxyBindAddress).toBe('0.0.0.0');
+    expect(cfg.proxyPublicHost).toBe('');
+    expect(cfg.clashApiBasePort).toBe(9090);
+    expect(typeof cfg.clashApiSecret).toBe('string');
+    expect(cfg.clashApiSecret.length).toBeGreaterThan(0);
+    expect(cfg.singboxInstancePortStride).toBe(1000);
+    expect(cfg.singboxProxyInboundOffset).toBe(0);
+    expect(cfg.maxDrainSeconds).toBe(300);
+    expect(cfg.instanceReadyTimeoutMs).toBe(8000);
+  });
+
+  it('overrides new proxy/clash config from env', () => {
+    process.env['SUBSCRIPTION_URL'] = 'https://example.com/sub';
+    process.env['PROXY_PORT'] = '18080';
+    process.env['CLASH_API_SECRET'] = 'fixed-secret';
+    process.env['MAX_DRAIN_SECONDS'] = '60';
+    const cfg = loadConfig();
+    expect(cfg.proxyPort).toBe(18080);
+    expect(cfg.clashApiSecret).toBe('fixed-secret');
+    expect(cfg.maxDrainSeconds).toBe(60);
+  });
 });
 
 describe('nodeKey', () => {
@@ -89,5 +125,22 @@ describe('nodeKey', () => {
     const k1 = nodeKey({ protocol: 'ss', server: 's.com', port: 8388, credential: 'pass', transportParams: '' });
     const k2 = nodeKey({ protocol: 'ss', server: 's.com', port: 8388, credential: 'pass', transportParams: '' });
     expect(k1).toBe(k2);
+  });
+});
+
+describe('extended types', () => {
+  it('Node carries originalUri', () => {
+    const n: Node = { key: 'k', name: 'n', protocol: 'trojan', server: 's', port: 443, raw: {}, originalUri: 'trojan://x' };
+    expect(n.originalUri).toBe('trojan://x');
+  });
+
+  it('NodeView carries raw and originalUri', () => {
+    const v: NodeView = {
+      key: 'k', name: 'n', protocol: 'trojan', server: 's', port: 443,
+      latency: 1, failCount: 0, lastCheck: 1, score: 1,
+      raw: { password: 'p' }, originalUri: 'trojan://x',
+    };
+    expect(v.raw['password']).toBe('p');
+    expect(v.originalUri).toBe('trojan://x');
   });
 });

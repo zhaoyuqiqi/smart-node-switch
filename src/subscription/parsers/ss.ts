@@ -31,6 +31,7 @@ export function parseSs(uri: string): Node | null {
         protocol: 'ss',
         server,
         port,
+        originalUri: uri,
         raw: { method, password },
       };
     }
@@ -59,6 +60,7 @@ export function parseSs(uri: string): Node | null {
         protocol: 'ss',
         server,
         port,
+        originalUri: uri,
         raw: { method, password },
       };
     }

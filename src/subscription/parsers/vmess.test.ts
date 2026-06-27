@@ -46,4 +46,11 @@ describe('parseVmess', () => {
     const b = parseVmess(uri);
     expect(a!.key).toBe(b!.key);
   });
+
+  it('stores the original URI', () => {
+    const json = JSON.stringify({ add: '1.2.3.4', port: '8080', id: 'uuid-x', ps: 'V' });
+    const uri = 'vmess://' + btoa(json);
+    const node = parseVmess(uri);
+    expect(node!.originalUri).toBe(uri);
+  });
 });

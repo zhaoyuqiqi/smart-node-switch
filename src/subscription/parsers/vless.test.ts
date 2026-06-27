@@ -42,4 +42,10 @@ describe('parseVless', () => {
     const b = parseVless('vless://uuid@h.com:443?type=ws');
     expect(a!.key).not.toBe(b!.key);
   });
+
+  it('stores the original URI', () => {
+    const uri = 'vless://uuid-x@1.2.3.4:443?security=tls#VL';
+    const node = parseVless(uri);
+    expect(node!.originalUri).toBe(uri);
+  });
 });

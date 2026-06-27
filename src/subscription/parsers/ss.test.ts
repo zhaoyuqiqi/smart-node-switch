@@ -42,4 +42,10 @@ describe('parseSs', () => {
     const b = parseSs(uri);
     expect(a!.key).toBe(b!.key);
   });
+
+  it('stores the original URI', () => {
+    const uri = 'ss://' + btoa('aes-256-gcm:pass') + '@1.2.3.4:8388#SS';
+    const node = parseSs(uri);
+    expect(node!.originalUri).toBe(uri);
+  });
 });

@@ -43,6 +43,7 @@ export function parseVmess(uri: string): Node | null {
       protocol: 'vmess',
       server,
       port,
+      originalUri: uri,
       raw: {
         uuid,
         alterId: Number(cfg.aid ?? 0),

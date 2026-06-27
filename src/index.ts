@@ -1,46 +1,68 @@
 import { Elysia } from 'elysia';
 import { loadConfig } from './config.ts';
 import { createRedisStore } from './store/state-store.ts';
-import { SingBoxProcess } from './singbox/process.ts';
+import { SingBoxInstance } from './singbox/instance.ts';
+import { InstanceOrchestrator } from './singbox/orchestrator.ts';
+import { TcpRelay } from './relay.ts';
 import { fetchSubscription } from './subscription/fetch.ts';
 import { parseSubscription } from './subscription/parse.ts';
 import { probe } from './singbox/probe.ts';
 import { Monitor } from './monitor.ts';
 import { registerRoutes } from './api.ts';
+import type { Node } from './types.ts';
 
 async function main() {
   const config = loadConfig();
-
-  // Redis store
   const store = createRedisStore(config.redisUrl);
 
-  // Fetch initial subscription
   console.log(`[init] Fetching subscription from ${config.subscriptionUrl}`);
-  const lines = await fetchSubscription(config.subscriptionUrl);
-  const nodes = parseSubscription(lines);
+  const nodes = parseSubscription(await fetchSubscription(config.subscriptionUrl));
   console.log(`[init] Parsed ${nodes.length} nodes`);
 
-  // Start sing-box
-  const singbox = new SingBoxProcess(config.singboxBin, config.singboxBasePort);
-  const portMap = await singbox.start(nodes);
-  console.log(`[init] sing-box started with ${portMap.size} ports`);
-
-  // Refresh function for monitor
-  const refresh = async () => {
-    const newLines = await fetchSubscription(config.subscriptionUrl);
-    const newNodes = parseSubscription(newLines);
-    const newPortMap = await singbox.restart(newNodes);
-    monitor.updateNodes(newNodes, newPortMap);
-    return newNodes;
+  // Instance factory: blue/green alternate base ports via stride.
+  let instanceGen = 0;
+  const createInstance = (instNodes: Node[], exclude: Set<number>): SingBoxInstance => {
+    const gen = instanceGen++;
+    const stride = config.singboxInstancePortStride;
+    return new SingBoxInstance({
+      binPath: config.singboxBin,
+      nodes: instNodes,
+      basePort: config.singboxBasePort + (gen % 2) * stride,
+      proxyInboundOffset: config.singboxProxyInboundOffset,
+      clashPort: config.clashApiBasePort + (gen % 2),
+      clashSecret: config.clashApiSecret,
+      readyTimeoutMs: config.instanceReadyTimeoutMs,
+      exclude,
+      portStride: stride,
+    });
   };
 
-  // Monitor
+  // First instance.
+  const first = createInstance(nodes, new Set());
+  await first.start();
+  if (!(await first.ready())) {
+    throw new Error('[init] first sing-box instance failed readiness');
+  }
+  console.log(`[init] sing-box ready: in-proxy=${first.proxyInboundPort} clash=${first.clashPort}`);
+
+  // Always-on relay pointing at the first instance's in-proxy port.
+  const relay = new TcpRelay({
+    bindAddress: config.proxyBindAddress,
+    port: config.proxyPort,
+    initialUpstreamPort: first.proxyInboundPort,
+  });
+  relay.start();
+  console.log(`[init] relay listening on ${config.proxyBindAddress}:${config.proxyPort}`);
+
+  // Monitor needs a mutable handle to the active instance's clash + portMap.
+  let activeClash = first.clash;
   const monitor = new Monitor({
     store,
     probe,
-    refresh,
+    refresh: async () =>
+      parseSubscription(await fetchSubscription(config.subscriptionUrl)),
     nodes,
-    portMap,
+    portMap: first.portMap,
     intervalSeconds: config.checkIntervalSeconds,
     maxConcurrency: config.maxConcurrency,
     refreshThreshold: config.refreshThreshold,
@@ -50,29 +72,46 @@ async function main() {
     revivalSeconds: config.revivalSeconds,
     testUrl: config.testUrl,
     probeTimeoutMs: config.probeTimeoutMs,
+    clash: { setSelector: (t) => activeClash.setSelector(t) },
   });
 
-  // Elysia app
-  const app = new Elysia();
-  registerRoutes(app, monitor, store);
+  const orchestrator = new InstanceOrchestrator({
+    relay,
+    initial: first,
+    createInstance,
+    maxDrainSeconds: config.maxDrainSeconds,
+    onActiveChange: (inst) => {
+      // CV1: re-point monitor's portMap + clash at the new active instance,
+      // otherwise monitor goes blind ("no port for") to the new nodes.
+      activeClash = (inst as SingBoxInstance).clash;
+      monitor.updateNodes(monitor.getNodes(), (inst as SingBoxInstance).portMap);
+    },
+  });
+  // Wire orchestrator into monitor after construction.
+  monitor.setOrchestrator(orchestrator);
 
-  // Lifecycle: start monitor on app start, stop on shutdown
+  const app = new Elysia();
+  registerRoutes(app, monitor, store, {
+    publicHost: config.proxyPublicHost,
+    port: config.proxyPort,
+  });
+
   app.onStart(async () => {
     console.log('[monitor] Starting health check scheduler...');
     void monitor.start();
   });
-
   app.onStop(async () => {
     console.log('[monitor] Stopping...');
     monitor.stop();
-    await singbox.stop();
+    relay.stop();
+    await orchestrator.active.stop();
   });
 
-  // Graceful shutdown: clean up sing-box temp files on process exit
   const shutdown = async (signal: string) => {
     console.log(`[shutdown] received ${signal}, cleaning up...`);
     monitor.stop();
-    await singbox.stop();
+    relay.stop();
+    await orchestrator.active.stop();
     process.exit(0);
   };
   process.on('SIGINT', () => void shutdown('SIGINT'));

@@ -24,6 +24,7 @@ export function parseTrojan(uri: string): Node | null {
       protocol: 'trojan',
       server,
       port,
+      originalUri: uri,
       raw: {
         password,
         sni: url.searchParams.get('sni') ?? url.searchParams.get('peer') ?? server,
