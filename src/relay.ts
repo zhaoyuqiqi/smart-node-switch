@@ -7,6 +7,21 @@
 type TcpSocket = import('bun').Socket;
 type TcpServer = import('bun').TCPSocketListener<undefined>;
 
+type TunableSocket = {
+  setNoDelay?: (enabled: boolean) => void;
+  setKeepAlive?: (enabled: boolean, initialDelay?: number) => void;
+};
+
+export function optimizeTcpSocket(socket: unknown): void {
+  const tuned = socket as TunableSocket;
+  try {
+    tuned.setNoDelay?.(true);
+  } catch {}
+  try {
+    tuned.setKeepAlive?.(true, 15);
+  } catch {}
+}
+
 /**
  * Maximum number of bytes we will buffer from the client while the upstream
  * connection is still being established. If a client sends more than this
@@ -76,6 +91,7 @@ export class TcpRelay {
       port: this.opts.port,
       socket: {
         open(client) {
+          optimizeTcpSocket(client);
           if (!self.accepting) {
             try { client.end(); } catch {}
             return;
@@ -125,6 +141,7 @@ export class TcpRelay {
         port: pair.upstreamPort,
         socket: {
           open(up) {
+            optimizeTcpSocket(up);
             if (!self.conns.has(pair)) {
               try { up.end(); } catch {}
               return;

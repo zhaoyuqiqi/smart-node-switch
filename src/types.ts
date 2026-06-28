@@ -27,6 +27,7 @@ export interface NodeView {
   server: string;
   port: number;
   isBest: boolean;
+  latencyMs: number | null;
   raw: Record<string, unknown>;
   originalUri: string;
 }
@@ -48,11 +49,9 @@ export interface Config {
   singboxProxyInboundOffset: number;
   maxDrainSeconds: number;
   instanceReadyTimeoutMs: number;
+  proxyAuthUser: string;
+  proxyAuthPass: string;
 }
-
-// Redis key helpers
-export const stateKey = (key: string) => `node:${key}`;
-export const deadKey = (key: string) => `dead:${key}`;
 
 // Generate node identity key: sha1(protocol|server|port|credential|transportParams).slice(0,16)
 export function nodeKey(params: {

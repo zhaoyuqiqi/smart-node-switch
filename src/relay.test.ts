@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { TcpRelay } from './relay.ts';
+import { TcpRelay, optimizeTcpSocket } from './relay.ts';
 
 // echo server that prefixes each reply with a label, so we can tell A from B
 function startEcho(label: string) {
@@ -28,6 +28,25 @@ const cleanups: Array<() => void> = [];
 afterEach(() => { cleanups.forEach((c) => c()); cleanups.length = 0; });
 
 describe('TcpRelay', () => {
+  it('enables low-latency socket options when available', () => {
+    const calls: string[] = [];
+    const socket = {
+      setNoDelay(enabled: boolean) {
+        calls.push(`nodelay:${enabled}`);
+      },
+      setKeepAlive(enabled: boolean, initialDelay: number) {
+        calls.push(`keepalive:${enabled}:${initialDelay}`);
+      },
+    };
+
+    optimizeTcpSocket(socket);
+
+    expect(calls).toEqual(['nodelay:true', 'keepalive:true:15']);
+  });
+
+  it('is safe when socket does not support tuning methods', () => {
+    expect(() => optimizeTcpSocket({})).not.toThrow();
+  });
 
   it('transparently forwards to the active upstream', async () => {
     const a = startEcho('A');

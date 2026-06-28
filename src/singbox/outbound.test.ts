@@ -7,6 +7,19 @@ function makeNode(overrides: Partial<Node> & Pick<Node, 'protocol' | 'server' | 
 }
 
 describe('toOutbound - trojan', () => {
+  it('maps ws early-data from path query', () => {
+    const node = makeNode({
+      protocol: 'trojan', server: 't.com', port: 443,
+      raw: { password: 'secret', sni: 'sni.com', allowInsecure: false, type: 'ws', host: 'cdn.com', path: '/?ed=2560' },
+    });
+    const out = toOutbound(node);
+    const transport = out['transport'] as Record<string, unknown>;
+    expect(transport['type']).toBe('ws');
+    expect(transport['path']).toBe('/');
+    expect(transport['max_early_data']).toBe(2560);
+    expect(transport['early_data_header_name']).toBe('Sec-WebSocket-Protocol');
+  });
+
   it('produces correct trojan outbound', () => {
     const node = makeNode({
       protocol: 'trojan', server: 't.com', port: 443,
@@ -45,6 +58,18 @@ describe('toOutbound - vmess', () => {
     const transport = out['transport'] as Record<string, unknown>;
     expect(transport['type']).toBe('ws');
     expect(transport['path']).toBe('/path');
+  });
+
+  it('maps vmess ws early-data from path query', () => {
+    const node = makeNode({
+      protocol: 'vmess', server: 'v.com', port: 443,
+      raw: { uuid: 'uuid-ws', alterId: 0, network: 'ws', tls: true, sni: 'cdn.com', wsPath: '/ws?ed=2048', wsHost: 'cdn.com' },
+    });
+    const out = toOutbound(node);
+    const transport = out['transport'] as Record<string, unknown>;
+    expect(transport['path']).toBe('/ws');
+    expect(transport['max_early_data']).toBe(2048);
+    expect(transport['early_data_header_name']).toBe('Sec-WebSocket-Protocol');
   });
 });
 

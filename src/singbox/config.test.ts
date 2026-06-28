@@ -21,6 +21,21 @@ describe('buildConfig(urltest)', () => {
     expect(inProxy!['listen_port']).toBe(r.proxyInboundPort);
   });
 
+  it('adds mixed inbound auth users when proxy credentials are provided', async () => {
+    const r = await buildConfig({
+      nodes: [node('a')],
+      basePort: 41120,
+      proxyInboundOffset: 0,
+      clashPort: 41951,
+      clashSecret: 's',
+      proxyAuthUser: 'demo-user',
+      proxyAuthPass: 'demo-pass',
+    });
+    const inProxy = r.config.inbounds.find((i) => i['tag'] === 'in-proxy');
+    expect(inProxy).toBeDefined();
+    expect(inProxy!['users']).toEqual([{ username: 'demo-user', password: 'demo-pass' }]);
+  });
+
   it('adds urltest outbound over all node outbounds', async () => {
     const r = await buildConfig({
       nodes: [node('a'), node('b')], basePort: 41200, proxyInboundOffset: 0, clashPort: 41960, clashSecret: 's', testUrl: 'https://www.google.com',

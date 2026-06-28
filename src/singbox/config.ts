@@ -18,6 +18,8 @@ export interface BuildConfigParams {
   clashSecret: string;
   testUrl?: string;
   exclude?: Set<number>;
+  proxyAuthUser?: string;
+  proxyAuthPass?: string;
 }
 
 export interface BuildConfigResult {
@@ -35,18 +37,30 @@ export interface BuildConfigResult {
  * - route in-proxy -> proxy-auto
  */
 export async function buildConfig(params: BuildConfigParams): Promise<BuildConfigResult> {
-  const { nodes, basePort, proxyInboundOffset, clashPort, clashSecret, testUrl, exclude } = params;
+  const {
+    nodes,
+    basePort,
+    proxyInboundOffset,
+    clashPort,
+    clashSecret,
+    testUrl,
+    exclude,
+    proxyAuthUser,
+    proxyAuthPass,
+  } = params;
   const excludeSet = new Set(exclude ?? []);
 
   const ports = await allocatePorts(1, basePort, excludeSet);
   const proxyInboundPort = ports[0]! + proxyInboundOffset;
 
+  const hasAuth = Boolean(proxyAuthUser && proxyAuthPass);
   const inbounds: Record<string, unknown>[] = [
     {
       type: 'mixed',
       tag: 'in-proxy',
       listen: '127.0.0.1',
       listen_port: proxyInboundPort,
+      ...(hasAuth ? { users: [{ username: proxyAuthUser, password: proxyAuthPass }] } : {}),
     },
   ];
 

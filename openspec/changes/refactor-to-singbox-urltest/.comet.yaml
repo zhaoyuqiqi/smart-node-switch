@@ -1,5 +1,5 @@
 workflow: full
-phase: verify
+phase: build
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -12,9 +12,9 @@ auto_transition: true
 base_ref: d01d383b33f215de5cefc0d764668c277b6c863e
 design_doc: docs/superpowers/specs/2026-06-28-refactor-to-singbox-urltest-design.md
 plan: docs/superpowers/plans/2026-06-28-refactor-to-singbox-urltest.md
-verify_result: pending
+verify_result: fail
 verification_report: docs/superpowers/reports/2026-06-28-refactor-to-singbox-urltest-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-06-28
 verified_at: null
 archived: false

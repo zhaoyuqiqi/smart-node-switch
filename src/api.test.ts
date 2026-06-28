@@ -12,11 +12,12 @@ function makeNode(key: string): Node {
   };
 }
 
-function fakeMonitor(nodes: Node[], bestKey: string | null): Monitor {
+function fakeMonitor(nodes: Node[], bestKey: string | null, latencies: Record<string, number | null> = {}): Monitor {
   return {
     getNodes: () => nodes,
     getBestKey: () => bestKey,
     getBestNode: () => (bestKey ? nodes.find((n) => n.key === bestKey) ?? null : null),
+    getLatency: (key: string) => latencies[key] ?? null,
   } as unknown as Monitor;
 }
 
@@ -28,12 +29,14 @@ describe('GET /nodes', () => {
   it('returns all nodes with isBest marker', async () => {
     const a = makeNode('aaa');
     const b = makeNode('bbb');
-    const app = registerRoutes(new Elysia(), fakeMonitor([a, b], 'bbb'));
+    const app = registerRoutes(new Elysia(), fakeMonitor([a, b], 'bbb', { aaa: 220, bbb: 88 }));
     const res = await get(app, '/nodes');
     const body = await res.json() as any;
     expect(body.count).toBe(2);
     expect(body.nodes.find((n: any) => n.key === 'aaa').isBest).toBe(false);
     expect(body.nodes.find((n: any) => n.key === 'bbb').isBest).toBe(true);
+    expect(body.nodes.find((n: any) => n.key === 'aaa').latencyMs).toBe(220);
+    expect(body.nodes.find((n: any) => n.key === 'bbb').latencyMs).toBe(88);
   });
 });
 

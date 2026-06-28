@@ -1,5 +1,32 @@
 import type { Node } from '../types.ts';
 
+function normalizeWsPathAndEarlyData(pathValue: unknown): {
+  path: string;
+  maxEarlyData: number | null;
+} {
+  if (typeof pathValue !== 'string' || pathValue.length === 0) {
+    return { path: '/', maxEarlyData: null };
+  }
+
+  const qIndex = pathValue.indexOf('?');
+  const rawPath = qIndex >= 0 ? pathValue.slice(0, qIndex) : pathValue;
+  const rawQuery = qIndex >= 0 ? pathValue.slice(qIndex + 1) : '';
+  const query = new URLSearchParams(rawQuery);
+  const ed = query.get('ed');
+  query.delete('ed');
+
+  const pathBase = rawPath.length > 0 ? rawPath : '/';
+  const queryLeft = query.toString();
+  const normalizedPath = queryLeft ? `${pathBase}?${queryLeft}` : pathBase;
+
+  if (!ed) return { path: normalizedPath, maxEarlyData: null };
+  const value = Number(ed);
+  if (!Number.isFinite(value) || value <= 0) {
+    return { path: normalizedPath, maxEarlyData: null };
+  }
+  return { path: normalizedPath, maxEarlyData: Math.floor(value) };
+}
+
 /**
  * Map internal Node to sing-box outbound JSON object.
  */
@@ -25,10 +52,15 @@ export function toOutbound(node: Node): Record<string, unknown> {
 
       // WebSocket transport
       if (raw['type'] === 'ws') {
+        const ws = normalizeWsPathAndEarlyData(raw['path']);
         out['transport'] = {
           type: 'ws',
-          path: raw['path'] || '/',
+          path: ws.path,
           headers: raw['host'] ? { Host: raw['host'] } : undefined,
+          ...(ws.maxEarlyData ? {
+            max_early_data: ws.maxEarlyData,
+            early_data_header_name: 'Sec-WebSocket-Protocol',
+          } : {}),
         };
       } else if (raw['type'] === 'grpc') {
         out['transport'] = { type: 'grpc' };
@@ -42,7 +74,14 @@ export function toOutbound(node: Node): Record<string, unknown> {
       const transport: Record<string, unknown> = {};
       if (raw['network'] === 'ws') {
         transport['type'] = 'ws';
-        if (raw['wsPath']) transport['path'] = raw['wsPath'];
+        if (raw['wsPath']) {
+          const ws = normalizeWsPathAndEarlyData(raw['wsPath']);
+          transport['path'] = ws.path;
+          if (ws.maxEarlyData) {
+            transport['max_early_data'] = ws.maxEarlyData;
+            transport['early_data_header_name'] = 'Sec-WebSocket-Protocol';
+          }
+        }
         if (raw['wsHost']) transport['headers'] = { Host: raw['wsHost'] };
       } else if (raw['network'] === 'grpc') {
         transport['type'] = 'grpc';
@@ -114,10 +153,15 @@ export function toOutbound(node: Node): Record<string, unknown> {
 
       const netType = raw['type'];
       if (netType === 'ws') {
+        const ws = normalizeWsPathAndEarlyData(raw['wsPath']);
         out['transport'] = {
           type: 'ws',
-          path: raw['wsPath'] || '/',
+          path: ws.path,
           headers: raw['wsHost'] ? { Host: raw['wsHost'] } : undefined,
+          ...(ws.maxEarlyData ? {
+            max_early_data: ws.maxEarlyData,
+            early_data_header_name: 'Sec-WebSocket-Protocol',
+          } : {}),
         };
       } else if (netType === 'grpc') {
         out['transport'] = { type: 'grpc' };

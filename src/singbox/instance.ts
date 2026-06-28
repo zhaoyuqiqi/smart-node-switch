@@ -21,6 +21,8 @@ export interface InstanceParams {
   clashSecret: string;
   testUrl?: string;
   readyTimeoutMs: number;
+  proxyAuthUser?: string;
+  proxyAuthPass?: string;
   exclude?: Set<number>;
   spawn?: SpawnFn;
   maxStartRetries?: number;
@@ -100,6 +102,8 @@ export class SingBoxInstance {
         clashSecret: this.params.clashSecret,
         testUrl: this.params.testUrl,
         exclude: this.params.exclude,
+        proxyAuthUser: this.params.proxyAuthUser,
+        proxyAuthPass: this.params.proxyAuthPass,
       });
       await writeFile(this.configPath, JSON.stringify(built.config, null, 2));
       const proc = spawn([this.params.binPath, 'run', '-c', this.configPath]);

@@ -26,5 +26,7 @@ export function loadConfig(): Config {
     singboxProxyInboundOffset: Number(process.env['SINGBOX_PROXY_INBOUND_OFFSET'] ?? 0),
     maxDrainSeconds: Number(process.env['MAX_DRAIN_SECONDS'] ?? 300),
     instanceReadyTimeoutMs: Number(process.env['INSTANCE_READY_TIMEOUT_MS'] ?? 8000),
+    proxyAuthUser: process.env['PROXY_AUTH_USER'] ?? '',
+    proxyAuthPass: process.env['PROXY_AUTH_PASS'] ?? '',
   };
 }

@@ -2,6 +2,7 @@
 change: add-best-proxy-gateway
 design-doc: docs/superpowers/specs/2026-06-27-best-proxy-gateway-design.md
 base-ref: 79c2bd7c41904827fafdbeb77ef97de89cc60f07
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 # Best Proxy Gateway 实现计划
@@ -24,6 +25,7 @@ base-ref: 79c2bd7c41904827fafdbeb77ef97de89cc60f07
 - 每个 task 结束即 commit；遇失败先加载 systematic-debugging，定位根因后再修。
 - 设计细节以 Design Doc 为准（本计划按节引用，不复述）。`selector` 出站 MUST 带 `interrupt_exist_connections: false`。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## 文件结构
@@ -50,6 +52,7 @@ base-ref: 79c2bd7c41904827fafdbeb77ef97de89cc60f07
 
 依赖顺序：Task 1（config/types）→ Task 2（Req1）→ Task 3（Req2 ports）→ Task 4（buildConfig selector/clash_api）→ Task 5（ClashClient）→ Task 6（relay）→ Task 7（SingBoxInstance + ready）→ Task 8（orchestrator 蓝绿）→ Task 9（monitor 切 selector + 触发蓝绿）→ Task 10（/proxy）→ Task 11（index 装配）→ Task 12（e2e + README）。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 1: 配置与类型扩展
@@ -223,6 +226,7 @@ git commit -m "feat: add proxy/clash config keys and originalUri/raw type fields
 
 **Done check:** `bun test src/config.test.ts` 全绿；`Config`/`Node`/`NodeView` 含全部新字段。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 2: Req1 — parser 保存 originalUri + API 补全 raw/originalUri
@@ -406,6 +410,7 @@ git commit -m "feat: expose raw and originalUri via /nodes and /nodes/best"
 
 **Done check:** `/nodes` 与 `/nodes/best` 返回对象含 `raw` + `originalUri`；四 parser 保存原始 URI。满足 node-health-monitor spec「查询接口返回完整节点信息」。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 3: Req2 — 端口可用性探测与排除集分配
@@ -539,6 +544,7 @@ git commit -m "feat: add port availability probing and exclusion-aware allocatio
 
 **Done check:** `allocatePorts` 跳过占用端口与排除集；满足 node-health-monitor spec「sing-box 本地端口分配跳过占用」的分配侧。TOCTOU 启动重试在 Task 7。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 4: Req3 — buildConfig 加 in-proxy/selector/block/clash_api + 端口分配
@@ -790,6 +796,7 @@ git commit -m "feat: buildConfig adds in-proxy/selector/block/clash_api with por
 
 **Done check:** buildConfig 产出含 in-proxy、`proxy-select`（`interrupt_exist_connections:false`）、block、clash_api，端口按可用分配并避开 exclude。满足 best-proxy-gateway spec「基于评分的 best 节点热切换」配置侧与「切换不中断已建立连接」selector 侧。`process.ts` 此刻编译不过属预期，Task 7 修。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 5: Req3 — Clash API 客户端
@@ -946,6 +953,7 @@ git commit -m "feat: add Clash API client for selector hot-switch and readiness"
 
 **Done check:** `setSelector` 发 `PUT /proxies/proxy-select` 带 bearer；`waitReady` 轮询就绪。满足 best-proxy-gateway spec「基于评分的 best 节点热切换」客户端侧。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 6: Req3-HA — 常驻 TCP relay
@@ -1238,6 +1246,7 @@ git commit -m "feat: add always-on transparent TCP relay with atomic upstream sw
 
 **Done check:** relay 透明转发、`setUpstream` 后新连接走新上游、已建立连接保留旧上游、可统计在途连接。满足 best-proxy-gateway spec「固定转发代理入口」与「切换不中断已建立连接」蓝绿排空侧的 relay 基础。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 7: SingBoxInstance 封装 + 就绪探测 + TOCTOU 启动重试
@@ -1539,6 +1548,7 @@ git commit -m "feat: add SingBoxInstance with readiness probe and TOCTOU start r
 
 **Done check:** 实例可起停、就绪探测 = clash ready + in-proxy 可连、端口竞争启动失败回退更高端口段。满足 node-health-monitor spec「起始端口段存在占用仍能启动」的启动重试侧与 best-proxy-gateway spec「新实例就绪后才切换上游」就绪侧。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 8: Req3-HA — 蓝绿编排器
@@ -1806,6 +1816,7 @@ git commit -m "feat: add blue-green instance orchestrator with graceful drain"
 
 **Done check:** 就绪后才切上游、就绪失败保留旧实例、排空到 0 或超时硬关、exclude=旧端口。满足 best-proxy-gateway spec「节点更新期间代理高可用」「新实例就绪后才切换上游」「蓝绿切换优雅排空旧连接」。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 9: monitor — best 变化切 selector + 节点集变化触发蓝绿
@@ -2063,6 +2074,7 @@ git commit -m "feat: monitor switches selector on best-change and triggers blue-
 
 **Done check:** best 变切 `out-<key>`、无可用切 `block`、不变不重复下发；节点集变触发 `blueGreenSwap`、不变不触发。满足 best-proxy-gateway spec「基于评分的 best 节点热切换」「best 切换不重启进程」与高可用触发侧。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 10: GET /proxy API
@@ -2207,6 +2219,7 @@ git commit -m "feat: add GET /proxy returning stable proxy address and best node
 
 **Done check:** `/proxy` 有 best 返回地址+完整 NodeView，无可用返回 `{proxy:null,node:null}`。满足 best-proxy-gateway spec「查询稳定代理地址 API」。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 11: index.ts 装配 relay + orchestrator + clash 生命周期
@@ -2396,6 +2409,7 @@ git commit -m "feat: wire relay, blue-green orchestrator and clash lifecycle in 
 
 **Done check:** 启动建首个实例+relay+orchestrator，monitor 持 active clash 与 orchestrator，refresh 只拉解析、蓝绿由 orchestrator 接管。满足 best-proxy-gateway spec「固定转发代理入口」装配侧。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Task 12: 端到端验证与 README
@@ -2460,6 +2474,7 @@ git commit -m "docs: document proxy config, /proxy usage, python example and doc
 
 **Done check:** e2e 五项验证有记录（CRITICAL 项 PASS）；README 覆盖新配置、`/proxy`、Python 示例、Docker 两端口。满足 tasks.md §7。
 
+archived-with: 2026-06-28-add-best-proxy-gateway
 ---
 
 ## Self-Review

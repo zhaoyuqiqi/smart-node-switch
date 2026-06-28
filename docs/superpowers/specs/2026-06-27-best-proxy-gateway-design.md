@@ -2,6 +2,8 @@
 comet_change: add-best-proxy-gateway
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-28-add-best-proxy-gateway
+status: final
 ---
 
 # Best Proxy Gateway — 技术设计

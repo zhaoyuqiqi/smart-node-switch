@@ -7,6 +7,7 @@
 - 支持 `trojan` / `vmess` / `ss` / `vless` 订阅解析
 - 使用 sing-box 原生 `urltest` 自动选择当前最优节点
 - 固定代理入口（`PROXY_PORT`）+ 蓝绿实例切换，刷新期间已建立连接不中断
+- 支持可选代理账号密码鉴权（`PROXY_AUTH_USER` + `PROXY_AUTH_PASS`）
 - 当无可用节点时，`GET /proxy` 返回 `503`，relay 拒绝新连接
 - API 返回节点原始信息：`raw` + `originalUri`
 
@@ -35,6 +36,8 @@ bun install
 | `PROXY_PORT` | `8080` | 对外固定代理端口 |
 | `PROXY_BIND_ADDRESS` | `0.0.0.0` | relay 监听地址 |
 | `PROXY_PUBLIC_HOST` | `''` | `/proxy` 返回地址中的 host（空则回退请求 Host） |
+| `PROXY_AUTH_USER` | `''` | 代理鉴权用户名（与 `PROXY_AUTH_PASS` 同时设置才生效） |
+| `PROXY_AUTH_PASS` | `''` | 代理鉴权密码（与 `PROXY_AUTH_USER` 同时设置才生效） |
 | `CLASH_API_BASE_PORT` | `9090` | clash API 基址（蓝绿偏移） |
 | `CLASH_API_SECRET` | 启动时随机 | clash API 鉴权 secret |
 | `SINGBOX_INSTANCE_PORT_STRIDE` | `1000` | 蓝绿实例端口段间隔 |
@@ -54,7 +57,7 @@ SUBSCRIPTION_URL=https://your.sub/link bun run src/index.ts
 
 ### `GET /nodes`
 
-返回当前节点列表（非 Redis 状态），包含 `isBest` 标记。
+返回当前节点列表（运行时内存状态），包含 `isBest` 标记和 `latencyMs`（最近一次 urltest 延迟，毫秒；无数据时为 `null`）。
 
 示例：
 
@@ -69,6 +72,7 @@ SUBSCRIPTION_URL=https://your.sub/link bun run src/index.ts
       "server": "example.com",
       "port": 443,
       "isBest": true,
+      "latencyMs": 86,
       "raw": { "password": "***" },
       "originalUri": "trojan://***@example.com:443#node-a"
     }
@@ -108,6 +112,16 @@ if info.status_code == 503:
 
 proxy = info.json()["proxy"]
 resp = requests.get("https://www.google.com", proxies={"http": proxy, "https": proxy})
+print(resp.status_code)  # 预期 200
+```
+
+如果启用了代理鉴权（`PROXY_AUTH_USER` / `PROXY_AUTH_PASS`）：
+
+```python
+import requests
+
+auth_proxy = "http://your-user:your-pass@localhost:8080"
+resp = requests.get("https://www.google.com", proxies={"http": auth_proxy, "https": auth_proxy})
 print(resp.status_code)  # 预期 200
 ```
 

@@ -8,7 +8,10 @@ export interface MonitorOptions {
   intervalSeconds: number;
   refreshThreshold: number;
   refreshCooldownSeconds: number;
-  clash: { getCurrentOutbound(groupTag: string): Promise<string | null> };
+  clash: {
+    getCurrentOutbound(groupTag: string): Promise<string | null>;
+    getNodeLatencies?(): Promise<Record<string, number | null>>;
+  };
   orchestrator?: { blueGreenSwap(newNodes: Node[]): Promise<boolean> };
   onBestChange?: (bestKey: string | null) => void;
 }
@@ -16,10 +19,12 @@ export interface MonitorOptions {
 export class Monitor {
   private nodes: Node[];
   private timer: ReturnType<typeof setInterval> | null = null;
+  private bestSyncTimer: ReturnType<typeof setInterval> | null = null;
   private lastRefreshAt = Date.now() / 1000;
   private stopped = false;
   private isRunning = false;
   private bestKey: string | null = null;
+  private latencyByKey = new Map<string, number | null>();
 
   constructor(private opts: MonitorOptions) {
     this.nodes = opts.nodes;
@@ -35,9 +40,26 @@ export class Monitor {
 
   async start() {
     await this.runRound();
+
+    // Warm-up: urltest may need a few seconds before exposing the first `now` value.
+    if (!this.bestKey) {
+      const maxAttempts = 15;
+      for (let i = 0; i < maxAttempts && !this.bestKey && !this.stopped; i++) {
+        await Bun.sleep(1000);
+        await this.runRound(true);
+      }
+    }
+
     this.timer = setInterval(() => {
       void this.runRound();
     }, this.opts.intervalSeconds * 1000);
+
+    const bestSyncMs = Math.min(5000, this.opts.intervalSeconds * 1000);
+    if (bestSyncMs < this.opts.intervalSeconds * 1000) {
+      this.bestSyncTimer = setInterval(() => {
+        void this.runRound(true);
+      }, bestSyncMs);
+    }
   }
 
   stop() {
@@ -46,11 +68,14 @@ export class Monitor {
       clearInterval(this.timer);
       this.timer = null;
     }
+    if (this.bestSyncTimer) {
+      clearInterval(this.bestSyncTimer);
+      this.bestSyncTimer = null;
+    }
   }
 
   async runRound(skipRefreshCheck = false): Promise<void> {
-    if (this.stopped) return;
-    if (this.isRunning && !skipRefreshCheck) return;
+    if (this.stopped || this.isRunning) return;
     this.isRunning = true;
     try {
       await this.syncBestFromUrltest();
@@ -65,7 +90,13 @@ export class Monitor {
   }
 
   private async syncBestFromUrltest(): Promise<void> {
-    const outbound = await this.opts.clash.getCurrentOutbound('proxy-auto');
+    const [outbound, latencies] = await Promise.all([
+      this.opts.clash.getCurrentOutbound('proxy-auto'),
+      this.opts.clash.getNodeLatencies ? this.opts.clash.getNodeLatencies() : Promise.resolve<Record<string, number | null>>({}),
+    ]);
+
+    this.latencyByKey = new Map(Object.entries(latencies));
+
     const parsed = this.parseBestKey(outbound);
     if (parsed !== this.bestKey) {
       this.bestKey = parsed;
@@ -74,9 +105,16 @@ export class Monitor {
   }
 
   private parseBestKey(outboundTag: string | null): string | null {
-    if (!outboundTag || !outboundTag.startsWith('out-')) return null;
-    const key = outboundTag.slice(4);
-    return this.nodes.some((n) => n.key === key) ? key : null;
+    if (!outboundTag) return null;
+
+    const candidate = outboundTag.startsWith('out-') ? outboundTag.slice(4) : outboundTag;
+    const byKey = this.nodes.find((n) => n.key === candidate);
+    if (byKey) return byKey.key;
+
+    const byName = this.nodes.find((n) => n.name === candidate || n.name === outboundTag);
+    if (byName) return byName.key;
+
+    return null;
   }
 
   private async maybeRefresh(): Promise<void> {
@@ -104,7 +142,7 @@ export class Monitor {
       } else {
         this.nodes = newNodes;
       }
-      await this.runRound(true);
+      await this.syncBestFromUrltest();
     }
   }
 
@@ -126,5 +164,9 @@ export class Monitor {
 
   getBestKey(): string | null {
     return this.bestKey;
+  }
+
+  getLatency(key: string): number | null {
+    return this.latencyByKey.get(key) ?? null;
   }
 }

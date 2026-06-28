@@ -79,10 +79,14 @@ describe('loadConfig', () => {
     process.env['PROXY_PORT'] = '18080';
     process.env['CLASH_API_SECRET'] = 'fixed-secret';
     process.env['MAX_DRAIN_SECONDS'] = '60';
+    process.env['PROXY_AUTH_USER'] = 'demo-user';
+    process.env['PROXY_AUTH_PASS'] = 'demo-pass';
     const cfg = loadConfig();
     expect(cfg.proxyPort).toBe(18080);
     expect(cfg.clashApiSecret).toBe('fixed-secret');
     expect(cfg.maxDrainSeconds).toBe(60);
+    expect(cfg.proxyAuthUser).toBe('demo-user');
+    expect(cfg.proxyAuthPass).toBe('demo-pass');
   });
 });
 
@@ -121,6 +125,7 @@ describe('extended types', () => {
     const v: NodeView = {
       key: 'k', name: 'n', protocol: 'trojan', server: 's', port: 443,
       isBest: true,
+      latencyMs: 42,
       raw: { password: 'p' }, originalUri: 'trojan://x',
     };
     expect(v.raw['password']).toBe('p');

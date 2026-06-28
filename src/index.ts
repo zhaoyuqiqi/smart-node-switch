@@ -32,6 +32,8 @@ async function main() {
       exclude,
       portStride: stride,
       testUrl: config.testUrl,
+      proxyAuthUser: config.proxyAuthUser,
+      proxyAuthPass: config.proxyAuthPass,
     });
   };
 
@@ -62,7 +64,10 @@ async function main() {
     intervalSeconds: config.checkIntervalSeconds,
     refreshThreshold: config.refreshThreshold,
     refreshCooldownSeconds: config.refreshCooldownSeconds,
-    clash: { getCurrentOutbound: (tag) => activeClash.getCurrentOutbound(tag) },
+    clash: {
+      getCurrentOutbound: (tag) => activeClash.getCurrentOutbound(tag),
+      getNodeLatencies: () => activeClash.getNodeLatencies(),
+    },
     onBestChange: (bestKey) => {
       relay.setAccepting(Boolean(bestKey));
     },

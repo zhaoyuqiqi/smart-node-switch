@@ -48,6 +48,99 @@ describe('ClashClient.getCurrentOutbound', () => {
     const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
     expect(await client.getCurrentOutbound('proxy-auto')).toBe('out-abc');
   });
+
+  it('retries with Token auth when Bearer auth is rejected', async () => {
+    server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const auth = req.headers.get('authorization');
+        const url = new URL(req.url);
+        if (url.pathname !== '/proxies/proxy-auto') {
+          return new Response('not found', { status: 404 });
+        }
+        if (auth === 'Token s') {
+          return new Response(JSON.stringify({ now: 'out-token' }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 });
+      },
+    });
+    const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
+    expect(await client.getCurrentOutbound('proxy-auto')).toBe('out-token');
+  });
+
+  it('falls back to GET /proxies map when /proxies/{group} is unavailable', async () => {
+    server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/proxies/proxy-auto') {
+          return new Response('not found', { status: 404 });
+        }
+        if (url.pathname === '/proxies') {
+          return new Response(JSON.stringify({
+            proxies: {
+              'proxy-auto': { now: 'out-fallback' },
+            },
+          }), { status: 200 });
+        }
+        return new Response('not found', { status: 404 });
+      },
+    });
+    const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
+    expect(await client.getCurrentOutbound('proxy-auto')).toBe('out-fallback');
+  });
+
+  it('supports selected field as current outbound', async () => {
+    server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/proxies/proxy-auto') {
+          return new Response(JSON.stringify({ selected: 'out-selected' }), { status: 200 });
+        }
+        return new Response('not found', { status: 404 });
+      },
+    });
+    const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
+    expect(await client.getCurrentOutbound('proxy-auto')).toBe('out-selected');
+  });
+});
+
+describe('ClashClient.getNodeLatencies', () => {
+  it('returns latest delay for out-* proxies keyed by node key', async () => {
+    server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname !== '/proxies') {
+          return new Response('not found', { status: 404 });
+        }
+        return new Response(JSON.stringify({
+          proxies: {
+            'proxy-auto': { now: 'out-aaa' },
+            'out-aaa': {
+              history: [
+                { time: '2026-06-28T15:00:00+08:00', delay: 300 },
+                { time: '2026-06-28T15:00:05+08:00', delay: 120 },
+              ],
+            },
+            'out-bbb': {
+              history: [
+                { time: '2026-06-28T15:00:00+08:00', delay: 250 },
+              ],
+            },
+            'direct': {
+              history: [
+                { time: '2026-06-28T15:00:00+08:00', delay: 1 },
+              ],
+            },
+          },
+        }), { status: 200 });
+      },
+    });
+    const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
+    expect(await client.getNodeLatencies()).toEqual({ aaa: 120, bbb: 250 });
+  });
 });
 
 describe('ClashClient.waitReady', () => {
