@@ -15,30 +15,26 @@ TBD - created by archiving change add-node-health-monitor. Update Purpose after 
 - **THEN** 服务跳过该条目并继续解析其余节点,不抛出导致流程中断的错误
 
 ### Requirement: 经代理的健康检查
-服务 SHALL 借助内置 sing-box 二进制,通过被检测节点自身的代理通道,对配置的测试 URL 发起真实 HTTP 请求来检测节点健康度。检查 MUST 测量该请求的延迟(latency,毫秒);请求成功记为一次成功,失败或超时记为一次失败。
+服务 SHALL 借助内置 sing-box 二进制,通过统一代理入口对配置的测试 URL 发起真实 HTTP 请求来检测整体代理可达性。该检查 MUST 用于刷新判定与运行状态观察,而不是用于应用层最优节点选择。
 
-#### Scenario: 节点检查成功
-- **WHEN** 通过某节点的代理通道请求测试 URL 并收到成功响应
-- **THEN** 记录本次延迟为该节点的 latency,并将该节点标记为本轮成功
+#### Scenario: 统一代理入口检查成功
+- **WHEN** 通过服务统一代理入口请求测试 URL 并收到成功响应
+- **THEN** 服务记录本轮可达性检查成功,并将其用于刷新判定
 
-#### Scenario: 节点检查失败
-- **WHEN** 通过某节点的代理通道请求测试 URL 失败或超时
-- **THEN** 将该节点标记为本轮失败
+#### Scenario: 统一代理入口检查失败
+- **WHEN** 通过服务统一代理入口请求测试 URL 失败或超时
+- **THEN** 服务记录本轮可达性检查失败,并据此参与刷新阈值判断
 
 ### Requirement: 周期性并发检查调度
-服务 SHALL 周期性地对每个非死亡节点运行健康检查。检查周期 MUST 可通过配置设置,默认值为 30 秒。同一轮内的检查 MUST 并发执行(基于 p-queue),最大并发数 MUST 可配置,默认值为 10。被标记为死亡的节点在其复活时间到达前 MUST 被跳过。
+服务 SHALL 周期性执行健康检查调度。检查周期 MUST 可通过配置设置。实现 MAY 并发执行检查任务,但不得再要求“逐节点独立探测并发队列”作为必选实现路径。
 
 #### Scenario: 按配置周期循环检查
 - **WHEN** 服务运行且检查周期配置为 N 秒
-- **THEN** 服务每隔约 N 秒对所有非死亡节点各运行一次健康检查
+- **THEN** 服务每隔约 N 秒执行一次健康检查轮次
 
-#### Scenario: 受控并发执行检查
-- **WHEN** 一轮检查包含的待检节点数量超过最大并发数
-- **THEN** 服务同时进行中的检查数量不超过配置的最大并发数(默认 10),其余排队等待
-
-#### Scenario: 跳过死亡节点
-- **WHEN** 某节点处于死亡状态且尚未到达复活时间
-- **THEN** 该轮检查跳过该节点
+#### Scenario: 调度实现不强制逐节点探测
+- **WHEN** 服务使用 sing-box 原生 urltest 作为选优机制
+- **THEN** 调度层无需维护逐节点独立探测任务队列仍视为符合要求
 
 ### Requirement: 健康节点过低时自动刷新订阅
 服务 SHALL 在可用节点数(lastCheck > 0 且 failCount === 0)低于节点总数的某一占比阈值(默认 10%,且 MUST 可配置)时,重新从订阅 URL 拉取并解析最新节点信息。该判定 MUST 仅在每一轮健康检查完成后进行。刷新完成后,服务 MUST 立即触发一轮健康检查,而不必等待下一个周期。为避免在节点持续不可用时频繁拉取订阅,两次订阅刷新之间 MUST 有最小冷却间隔(可配置,默认 300 秒)。
@@ -78,33 +74,11 @@ TBD - created by archiving change add-node-health-monitor. Update Purpose after 
 - **THEN** 该节点的 latency、failCount、lastCheck 被更新并写入 Redis
 
 ### Requirement: 健康评分
-服务 SHALL 依据公式 `score = latency * 0.7 + failCount * 100 + (now - lastCheck) * 0.001` 计算每个节点的得分,其中 now 为当前时间戳、lastCheck 为最近一次检查的时间戳。得分越低代表节点越健康。
+服务 SHALL 将节点最优性判定职责下沉至 sing-box 原生 `urltest`，应用层不再维护或要求固定评分公式。
 
-#### Scenario: 按公式计算得分
-- **WHEN** 请求计算某节点的得分
-- **THEN** 服务返回 `latency*0.7 + failCount*100 + (now-lastCheck)*0.001` 的结果
-
-#### Scenario: 失败次数主导得分
-- **WHEN** 两个节点延迟相近但其一 failCount 更高
-- **THEN** failCount 更高的节点得分明显更高(更不健康)
-
-### Requirement: 成功重置失败计数
-服务 MUST 在某节点一次健康检查成功后,将该节点的 failCount 重置为 0。
-
-#### Scenario: 成功后归零失败计数
-- **WHEN** 某节点此前 failCount 大于 0,随后一次健康检查成功
-- **THEN** 该节点的 failCount 被重置为 0
-
-### Requirement: 连续失败死亡判定与复活
-服务 MUST 在某节点连续失败次数达到死亡阈值(默认 20,且 MUST 可配置)时,将该节点标记为死亡。死亡节点 SHALL 在复活时长(默认 24 小时,且 MUST 可配置)后自动恢复检查,该死亡状态及到期 MUST 借助 Redis 实现。
-
-#### Scenario: 连续失败达到阈值标记死亡
-- **WHEN** 某节点连续失败次数达到配置的死亡阈值
-- **THEN** 该节点被标记为死亡,并设定在复活时长之后到期
-
-#### Scenario: 复活时长后恢复检查
-- **WHEN** 某死亡节点已超过其复活时间
-- **THEN** 该节点恢复为可被检查状态,后续周期重新对其检查
+#### Scenario: 最优性判定由 urltest 提供
+- **WHEN** 系统需要确定当前最优节点
+- **THEN** 系统以 sing-box `urltest` 结果作为唯一判定来源
 
 ### Requirement: 查询全部可用节点 API
 服务 SHALL 提供 `GET /nodes` 接口,返回全部可用节点及其数量。可用节点定义为:**至少检查过一次(lastCheck > 0)且最近一次健康检查成功(failCount === 0)** 的节点。从未检查成功过的新节点(lastCheck === 0)和处于死亡状态的节点 MUST 不计入可用。

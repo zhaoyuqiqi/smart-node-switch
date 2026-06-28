@@ -2,6 +2,7 @@
 change: refactor-to-singbox-urltest
 design-doc: docs/superpowers/specs/2026-06-28-refactor-to-singbox-urltest-design.md
 base-ref: 5a30e22094c41b121d658d4ff32c06bf28574382
+archived-with: 2026-06-28-refactor-to-singbox-urltest
 ---
 
 # URLTest 重构实施计划
@@ -21,6 +22,7 @@ base-ref: 5a30e22094c41b121d658d4ff32c06bf28574382
 - 无可用节点时 `GET /proxy` 必须返回 `503`（含 reason），relay 拒绝新连接。
 - 所有改动必须通过 `bun run --bun tsc --noEmit` 与测试集验证。
 
+archived-with: 2026-06-28-refactor-to-singbox-urltest
 ---
 
 ### Task 1: 重构 sing-box 配置为 urltest 选优

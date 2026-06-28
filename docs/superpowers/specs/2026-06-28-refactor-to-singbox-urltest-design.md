@@ -2,6 +2,8 @@
 comet_change: refactor-to-singbox-urltest
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-06-28-refactor-to-singbox-urltest
+status: final
 ---
 
 ## 背景
