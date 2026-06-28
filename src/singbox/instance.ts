@@ -19,6 +19,7 @@ export interface InstanceParams {
   proxyInboundOffset: number;
   clashPort: number;
   clashSecret: string;
+  testUrl?: string;
   readyTimeoutMs: number;
   exclude?: Set<number>;
   spawn?: SpawnFn;
@@ -97,6 +98,7 @@ export class SingBoxInstance {
         proxyInboundOffset: this.params.proxyInboundOffset,
         clashPort,
         clashSecret: this.params.clashSecret,
+        testUrl: this.params.testUrl,
         exclude: this.params.exclude,
       });
       await writeFile(this.configPath, JSON.stringify(built.config, null, 2));

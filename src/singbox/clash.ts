@@ -1,5 +1,5 @@
 /**
- * Minimal Clash API client for sing-box runtime selector control.
+ * Minimal Clash API client for sing-box runtime selector/urltest control.
  */
 export function clashBaseUrl(port: number): string {
   return `http://127.0.0.1:${port}`;
@@ -26,6 +26,21 @@ export class ClashClient {
     });
     if (res.status < 200 || res.status >= 300) {
       throw new Error(`setSelector(${outboundTag}) failed: HTTP ${res.status}`);
+    }
+  }
+
+  /** Read current selected outbound tag from a selector/urltest proxy group. */
+  async getCurrentOutbound(groupTag: string): Promise<string | null> {
+    try {
+      const res = await fetch(`${this.baseUrl}/proxies/${groupTag}`, {
+        headers: this.headers(),
+        signal: AbortSignal.timeout(1000),
+      });
+      if (res.status < 200 || res.status >= 300) return null;
+      const body = await res.json() as { now?: unknown };
+      return typeof body.now === 'string' ? body.now : null;
+    } catch {
+      return null;
     }
   }
 

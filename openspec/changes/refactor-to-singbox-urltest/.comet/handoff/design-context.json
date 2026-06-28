@@ -1,0 +1,15 @@
+{
+  "change": "refactor-to-singbox-urltest",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "0d19c1b35600859b88214852ff28c3aea8353cb42d9359a753fb3e3e6cc01705",
+  "files": [
+    { "path": "openspec/changes/refactor-to-singbox-urltest/proposal.md", "sha256": "491c16a1edb162b71111955185822fe365763791a6c517f3cf5ffba86d813d83" },
+    { "path": "openspec/changes/refactor-to-singbox-urltest/design.md", "sha256": "dca65167d34bc0acaebd3f75f6d3bbf95e7eda04bdc8fef9e6f73c338f60c072" },
+    { "path": "openspec/changes/refactor-to-singbox-urltest/tasks.md", "sha256": "f344a5084d64dc73e850ebd007a1a1e9135a56ef50fedc6b85232b187c27854c" },
+    { "path": "openspec/changes/refactor-to-singbox-urltest/specs/node-health-monitor/spec.md", "sha256": "250304498d1592441475e97c025801fbaed4bd2d88588396e0bbe3d29836b1b7" },
+    { "path": "openspec/changes/refactor-to-singbox-urltest/specs/singbox-urltest-selection/spec.md", "sha256": "8a3f4518b56f0aa2fe40b87a44c9476a891bce74b7af089433c5416281dfdee3" }
+  ]
+}

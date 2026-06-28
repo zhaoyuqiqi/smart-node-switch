@@ -215,4 +215,30 @@ describe('TcpRelay', () => {
     await Bun.sleep(80);
     expect(relay.countConnectionsTo(a.port)).toBe(0);
   });
+
+  it('rejects new connections when accepting is disabled', async () => {
+    const a = startEcho('A');
+    cleanups.push(() => a.stop(true));
+    const relay = new TcpRelay({ bindAddress: '127.0.0.1', port: 0, initialUpstreamPort: a.port });
+    relay.start();
+    relay.setAccepting(false);
+    cleanups.push(() => relay.stop());
+
+    let closed = false;
+    const conn = await Bun.connect({
+      hostname: '127.0.0.1',
+      port: relay.port,
+      socket: {
+        open(s) { s.write('hello'); },
+        data() {},
+        close() { closed = true; },
+        error() { closed = true; },
+      },
+    });
+    const deadline = Date.now() + 1000;
+    while (!closed && Date.now() < deadline) await Bun.sleep(5);
+    conn.end();
+    expect(closed).toBe(true);
+    expect(relay.activeConnectionCount).toBe(0);
+  });
 });

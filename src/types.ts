@@ -26,10 +26,7 @@ export interface NodeView {
   protocol: string;
   server: string;
   port: number;
-  latency: number;
-  failCount: number;
-  lastCheck: number;
-  score: number;
+  isBest: boolean;
   raw: Record<string, unknown>;
   originalUri: string;
 }
@@ -37,17 +34,11 @@ export interface NodeView {
 export interface Config {
   subscriptionUrl: string;
   checkIntervalSeconds: number;
-  maxConcurrency: number;
   refreshThreshold: number;
   refreshCooldownSeconds: number;
-  nodeTtlSeconds: number;
-  deathThreshold: number;
-  revivalSeconds: number;
   testUrl: string;
-  probeTimeoutMs: number;
   singboxBasePort: number;
   singboxBin: string;
-  redisUrl: string;
   proxyPort: number;
   proxyBindAddress: string;
   proxyPublicHost: string;

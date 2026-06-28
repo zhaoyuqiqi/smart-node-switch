@@ -24,7 +24,7 @@ describe('SingBoxInstance.start', () => {
       readyTimeoutMs: 500, spawn: s.fn,
     });
     await inst.start();
-    expect(inst.portMap.get('a')).toBeGreaterThanOrEqual(42000);
+    expect(inst.portMap.size).toBe(0);
     expect(inst.proxyInboundPort).toBeGreaterThanOrEqual(42000);
     expect(inst.clashPort).toBe(42900);
     await inst.stop();

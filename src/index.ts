@@ -1,19 +1,16 @@
 import { Elysia } from 'elysia';
 import { loadConfig } from './config.ts';
-import { createRedisStore } from './store/state-store.ts';
 import { SingBoxInstance } from './singbox/instance.ts';
 import { InstanceOrchestrator } from './singbox/orchestrator.ts';
 import { TcpRelay } from './relay.ts';
 import { fetchSubscription } from './subscription/fetch.ts';
 import { parseSubscription } from './subscription/parse.ts';
-import { probe } from './singbox/probe.ts';
 import { Monitor } from './monitor.ts';
 import { registerRoutes } from './api.ts';
 import type { Node } from './types.ts';
 
 async function main() {
   const config = loadConfig();
-  const store = createRedisStore(config.redisUrl);
 
   console.log(`[init] Fetching subscription from ${config.subscriptionUrl}`);
   const nodes = parseSubscription(await fetchSubscription(config.subscriptionUrl));
@@ -34,6 +31,7 @@ async function main() {
       readyTimeoutMs: config.instanceReadyTimeoutMs,
       exclude,
       portStride: stride,
+      testUrl: config.testUrl,
     });
   };
 
@@ -52,27 +50,22 @@ async function main() {
     initialUpstreamPort: first.proxyInboundPort,
   });
   relay.start();
+  // 默认不接入新连接，待 monitor 首次同步出 best 后再打开。
+  relay.setAccepting(false);
   console.log(`[init] relay listening on ${config.proxyBindAddress}:${config.proxyPort}`);
 
-  // Monitor needs a mutable handle to the active instance's clash + portMap.
   let activeClash = first.clash;
   const monitor = new Monitor({
-    store,
-    probe,
     refresh: async () =>
       parseSubscription(await fetchSubscription(config.subscriptionUrl)),
     nodes,
-    portMap: first.portMap,
     intervalSeconds: config.checkIntervalSeconds,
-    maxConcurrency: config.maxConcurrency,
     refreshThreshold: config.refreshThreshold,
     refreshCooldownSeconds: config.refreshCooldownSeconds,
-    nodeTtlSeconds: config.nodeTtlSeconds,
-    deathThreshold: config.deathThreshold,
-    revivalSeconds: config.revivalSeconds,
-    testUrl: config.testUrl,
-    probeTimeoutMs: config.probeTimeoutMs,
-    clash: { setSelector: (t) => activeClash.setSelector(t) },
+    clash: { getCurrentOutbound: (tag) => activeClash.getCurrentOutbound(tag) },
+    onBestChange: (bestKey) => {
+      relay.setAccepting(Boolean(bestKey));
+    },
   });
 
   const orchestrator = new InstanceOrchestrator({
@@ -81,17 +74,13 @@ async function main() {
     createInstance,
     maxDrainSeconds: config.maxDrainSeconds,
     onActiveChange: (inst) => {
-      // CV1: re-point monitor's portMap + clash at the new active instance,
-      // otherwise monitor goes blind ("no port for") to the new nodes.
       activeClash = (inst as SingBoxInstance).clash;
-      monitor.updateNodes(monitor.getNodes(), (inst as SingBoxInstance).portMap);
     },
   });
-  // Wire orchestrator into monitor after construction.
   monitor.setOrchestrator(orchestrator);
 
   const app = new Elysia();
-  registerRoutes(app, monitor, store, {
+  registerRoutes(app, monitor, {
     publicHost: config.proxyPublicHost,
     port: config.proxyPort,
   });

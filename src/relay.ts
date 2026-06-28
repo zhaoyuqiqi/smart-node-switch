@@ -36,6 +36,7 @@ export class TcpRelay {
   private upstreamPort: number;
   private readonly upstreamHost: string;
   private readonly conns = new Set<ConnPair>();
+  private accepting = true;
 
   constructor(private readonly opts: RelayOptions) {
     this.upstreamPort = opts.initialUpstreamPort;
@@ -52,6 +53,10 @@ export class TcpRelay {
 
   get activeConnectionCount(): number {
     return this.conns.size;
+  }
+
+  setAccepting(accepting: boolean): void {
+    this.accepting = accepting;
   }
 
   countConnectionsTo(port: number): number {
@@ -71,6 +76,10 @@ export class TcpRelay {
       port: this.opts.port,
       socket: {
         open(client) {
+          if (!self.accepting) {
+            try { client.end(); } catch {}
+            return;
+          }
           const pair: ConnPair = {
             upstreamPort: self.upstreamPort, // snapshot at accept time
             client,
@@ -85,16 +94,9 @@ export class TcpRelay {
         },
         data(client, chunk) {
           const pair = (client as unknown as { data: ConnPair }).data;
-          // Single readiness signal: once `upstreamReady` is true the upstream
-          // socket is assigned (set together inside upstream `open`), so there
-          // is no window where ready is true but `upstream` is still null.
-          // NOTE: backpressure on the established client<->upstream pipe is not
-          // yet handled here (writes ignore the socket's writability / drain).
           if (pair.upstreamReady) {
             pair.upstream!.write(chunk);
           } else {
-            // Bound the pre-ready buffer: never grow it without limit while the
-            // upstream is still connecting.
             pair.pendingBytes += chunk.byteLength;
             if (pair.pendingBytes > MAX_PENDING_BYTES) {
               self.teardown(pair);
@@ -123,23 +125,10 @@ export class TcpRelay {
         port: pair.upstreamPort,
         socket: {
           open(up) {
-            // The client may have already disconnected while this upstream
-            // connection was still pending. In that case the pair was torn
-            // down and removed from `conns`; close this orphaned upstream now.
             if (!self.conns.has(pair)) {
               try { up.end(); } catch {}
               return;
             }
-            // Assign the upstream socket and flip readiness HERE, atomically,
-            // using the local `up` socket. In Bun this `open` callback can fire
-            // BEFORE the surrounding `await Bun.connect(...)` resolves, so we
-            // must NOT wait for the await to assign `pair.upstream` -- doing so
-            // leaves a window where `upstreamReady` is true but `pair.upstream`
-            // is still null, in which any client chunk would be buffered and
-            // never re-flushed (first-byte loss). Single-sourcing readiness on
-            // `upstreamReady` (set together with `pair.upstream`) closes that
-            // race: bytes buffered before this point are flushed exactly once
-            // and in order, and bytes arriving after go straight through.
             pair.upstream = up;
             pair.upstreamReady = true;
             for (const buffered of pair.clientBuffer) up.write(buffered);
@@ -157,9 +146,6 @@ export class TcpRelay {
           },
         },
       });
-      // If the pair was torn down before connect resolved (and `open` never
-      // ran, so it could not close the socket itself), ensure the freshly
-      // resolved socket is closed rather than orphaned.
       if (!this.conns.has(pair)) {
         try { upstream.end(); } catch {}
         return;

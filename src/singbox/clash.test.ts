@@ -33,6 +33,23 @@ describe('ClashClient.setSelector', () => {
   });
 });
 
+describe('ClashClient.getCurrentOutbound', () => {
+  it('returns now field from proxy group response', async () => {
+    server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/proxies/proxy-auto') {
+          return new Response(JSON.stringify({ now: 'out-abc' }), { status: 200 });
+        }
+        return new Response('not found', { status: 404 });
+      },
+    });
+    const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
+    expect(await client.getCurrentOutbound('proxy-auto')).toBe('out-abc');
+  });
+});
+
 describe('ClashClient.waitReady', () => {
   it('returns true once GET / responds 2xx', async () => {
     server = Bun.serve({ port: 0, fetch() { return new Response('{}', { status: 200 }); } });
