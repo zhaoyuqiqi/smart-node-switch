@@ -90,6 +90,26 @@ describe('Monitor(urltest)', () => {
     expect(monitor.getBestNode()).toBeNull();
   });
 
+  it('sets best null when selected outbound has null latency', async () => {
+    const a = makeNode('aaa');
+    const b = makeNode('bbb');
+    const monitor = new Monitor({
+      refresh: async () => [a, b],
+      nodes: [a, b],
+      intervalSeconds: 9999,
+      refreshThreshold: 0.1,
+      refreshCooldownSeconds: 9999,
+      clash: {
+        async getCurrentOutbound() { return 'out-bbb'; },
+        async getNodeLatencies() { return { aaa: 120, bbb: null }; },
+      },
+    });
+
+    await monitor.runRound();
+    expect(monitor.getBestKey()).toBeNull();
+    expect(monitor.getBestNode()).toBeNull();
+  });
+
   it('triggers refresh when no best and threshold is breached', async () => {
     const oldNodes = [makeNode('old')];
     const newNodes = [makeNode('new')];

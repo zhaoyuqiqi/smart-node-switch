@@ -23,6 +23,7 @@ describe('loadConfig', () => {
     'SINGBOX_PROXY_INBOUND_OFFSET',
     'MAX_DRAIN_SECONDS',
     'INSTANCE_READY_TIMEOUT_MS',
+    'DEBUG_MONITOR',
   ];
 
   beforeEach(() => {
@@ -45,9 +46,11 @@ describe('loadConfig', () => {
     expect(cfg.checkIntervalSeconds).toBe(30);
     expect(cfg.refreshThreshold).toBe(0.1);
     expect(cfg.refreshCooldownSeconds).toBe(300);
-    expect(cfg.testUrl).toBe('https://www.google.com');
+    expect(cfg.testUrl).toBe('https://cp.cloudflare.com');
     expect(cfg.singboxBasePort).toBe(30000);
-    expect(cfg.singboxBin).toBe('src/sing-box/sing-box');
+    const expectedDefaultBin =
+      process.platform === 'darwin' ? 'src/sing-box/sing-box-mac' : 'src/sing-box/sing-box-linux';
+    expect(cfg.singboxBin).toBe(expectedDefaultBin);
   });
 
   it('overrides defaults from env', () => {
@@ -66,12 +69,14 @@ describe('loadConfig', () => {
     expect(cfg.proxyBindAddress).toBe('0.0.0.0');
     expect(cfg.proxyPublicHost).toBe('');
     expect(cfg.clashApiBasePort).toBe(9090);
+    expect(cfg.clashApiBindAddress).toBe('127.0.0.1');
     expect(typeof cfg.clashApiSecret).toBe('string');
     expect(cfg.clashApiSecret.length).toBeGreaterThan(0);
     expect(cfg.singboxInstancePortStride).toBe(1000);
     expect(cfg.singboxProxyInboundOffset).toBe(0);
     expect(cfg.maxDrainSeconds).toBe(300);
     expect(cfg.instanceReadyTimeoutMs).toBe(8000);
+    expect(cfg.debugMonitor).toBe(false);
   });
 
   it('overrides new proxy/clash config from env', () => {
@@ -81,12 +86,14 @@ describe('loadConfig', () => {
     process.env['MAX_DRAIN_SECONDS'] = '60';
     process.env['PROXY_AUTH_USER'] = 'demo-user';
     process.env['PROXY_AUTH_PASS'] = 'demo-pass';
+    process.env['DEBUG_MONITOR'] = '1';
     const cfg = loadConfig();
     expect(cfg.proxyPort).toBe(18080);
     expect(cfg.clashApiSecret).toBe('fixed-secret');
     expect(cfg.maxDrainSeconds).toBe(60);
     expect(cfg.proxyAuthUser).toBe('demo-user');
     expect(cfg.proxyAuthPass).toBe('demo-pass');
+    expect(cfg.debugMonitor).toBe(true);
   });
 });
 

@@ -22,6 +22,45 @@
 bun install
 ```
 
+## Docker 打包与运行
+
+构建镜像：
+
+```bash
+docker build -t smart-node-switch:latest .
+```
+
+> 镜像内已安装系统 CA 证书（`ca-certificates`），用于 `sing-box` 的 HTTPS/TLS 证书校验。
+
+> 说明：容器运行依赖 `src/sing-box/sing-box`。请确保该文件为 **Linux 可执行** 的 sing-box 二进制。
+
+最小运行示例（仅暴露代理端口）：
+
+```bash
+docker run --rm \
+  -e SUBSCRIPTION_URL='https://your.sub/link' \
+  -e PROXY_AUTH_USER='your-user' \
+  -e PROXY_AUTH_PASS='your-pass' \
+  -p 8080:8080 \
+  smart-node-switch:latest
+```
+
+如需查看 API，再额外映射 `3000`：
+
+```bash
+docker run --rm \
+  -e SUBSCRIPTION_URL='https://your.sub/link' \
+  -p 8080:8080 \
+  -p 3000:3000 \
+  smart-node-switch:latest
+```
+
+端口建议：
+
+- 建议只对公网暴露 `8080`（代理入口）。
+- `3000`（业务 API）与 `9090`（clash API）尽量仅保留容器内访问。
+- 若对公网暴露 `8080`，建议同时设置 `PROXY_AUTH_USER` 与 `PROXY_AUTH_PASS`。
+
 ## 配置
 
 | 变量 | 默认值 | 说明 |
@@ -30,20 +69,22 @@ bun install
 | `CHECK_INTERVAL_SECONDS` | `30` | 轮询周期（秒） |
 | `REFRESH_THRESHOLD` | `0.1` | 可用性占比阈值（低于触发刷新） |
 | `REFRESH_COOLDOWN_SECONDS` | `300` | 刷新最小间隔（秒） |
-| `TEST_URL` | `https://www.google.com` | `urltest` 探测目标 |
+| `TEST_URL` | `https://http://cp.cloudflare.com` | `urltest` 探测目标 |
 | `SINGBOX_BASE_PORT` | `30000` | sing-box 端口段起点 |
-| `SINGBOX_BIN` | `src/sing-box/sing-box` | sing-box 二进制路径 |
+| `SINGBOX_BIN` | mac: `src/sing-box/sing-box-mac` / Linux: `src/sing-box/sing-box-linux` | sing-box 二进制路径（可手动覆盖） |
 | `PROXY_PORT` | `8080` | 对外固定代理端口 |
 | `PROXY_BIND_ADDRESS` | `0.0.0.0` | relay 监听地址 |
 | `PROXY_PUBLIC_HOST` | `''` | `/proxy` 返回地址中的 host（空则回退请求 Host） |
 | `PROXY_AUTH_USER` | `''` | 代理鉴权用户名（与 `PROXY_AUTH_PASS` 同时设置才生效） |
 | `PROXY_AUTH_PASS` | `''` | 代理鉴权密码（与 `PROXY_AUTH_USER` 同时设置才生效） |
 | `CLASH_API_BASE_PORT` | `9090` | clash API 基址（蓝绿偏移） |
+| `CLASH_API_BIND_ADDRESS` | `127.0.0.1` | clash API 监听地址；Docker 对外暴露时设为 `0.0.0.0` |
 | `CLASH_API_SECRET` | 启动时随机 | clash API 鉴权 secret |
 | `SINGBOX_INSTANCE_PORT_STRIDE` | `1000` | 蓝绿实例端口段间隔 |
 | `SINGBOX_PROXY_INBOUND_OFFSET` | `0` | in-proxy 端口偏移 |
 | `MAX_DRAIN_SECONDS` | `300` | 蓝绿切换旧实例最大排空时长 |
 | `INSTANCE_READY_TIMEOUT_MS` | `8000` | 新实例就绪超时 |
+| `DEBUG_MONITOR` | `false` | 打印 urltest 选优诊断日志（`1/true` 开启） |
 
 ## 运行
 
@@ -111,7 +152,7 @@ if info.status_code == 503:
     raise RuntimeError("当前无可用节点")
 
 proxy = info.json()["proxy"]
-resp = requests.get("https://www.google.com", proxies={"http": proxy, "https": proxy})
+resp = requests.get("https://http://cp.cloudflare.com", proxies={"http": proxy, "https": proxy})
 print(resp.status_code)  # 预期 200
 ```
 
@@ -121,7 +162,7 @@ print(resp.status_code)  # 预期 200
 import requests
 
 auth_proxy = "http://your-user:your-pass@localhost:8080"
-resp = requests.get("https://www.google.com", proxies={"http": auth_proxy, "https": auth_proxy})
+resp = requests.get("https://http://cp.cloudflare.com", proxies={"http": auth_proxy, "https": auth_proxy})
 print(resp.status_code)  # 预期 200
 ```
 

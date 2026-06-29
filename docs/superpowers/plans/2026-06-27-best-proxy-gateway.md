@@ -2445,10 +2445,10 @@ SUBSCRIPTION_URL=... REDIS_URL=redis://127.0.0.1:6379 bun run src/index.ts
      p=os.environ['P']; \
      h={'http':p,'https':p}; \
      o=urllib.request.build_opener(urllib.request.ProxyHandler(h)); \
-     print(o.open('https://www.google.com').status)" P="$PROXY"
+     print(o.open('https://http://cp.cloudflare.com').status)" P="$PROXY"
    ```
    预期打印 `204`。
-5. 刷新期间不中断：开一个长连接（如 `while true; do curl -s -x "$PROXY" https://www.google.com -o /dev/null -w "%{http_code}\n"; sleep 1; done`），手动触发刷新（让可用比例跌破阈值或重启订阅源），观察循环不出现连接被拒/中断窗口。
+5. 刷新期间不中断：开一个长连接（如 `while true; do curl -s -x "$PROXY" https://http://cp.cloudflare.com -o /dev/null -w "%{http_code}\n"; sleep 1; done`），手动触发刷新（让可用比例跌破阈值或重启订阅源），观察循环不出现连接被拒/中断窗口。
 
 若任一 CRITICAL 项（1、4、5）失败 → 加载 systematic-debugging 定位根因后修对应 task，再回到本步。e2e 本身不写自动化断言（非阻塞）。
 

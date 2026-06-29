@@ -102,7 +102,7 @@ async function probe(port, testUrl, timeoutMs): Promise<{ ok: boolean; latencyMs
 }
 ```
 - 利用 Bun `fetch` 的 `proxy` 选项走本地 mixed 口。
-- 默认 testUrl = `https://www.google.com`;成功判定 `status < 400`。
+- 默认 testUrl = `https://http://cp.cloudflare.com`;成功判定 `status < 400`。
 - 超时记失败。probe 作为可注入函数,monitor 测试时用 mock 替换。
 
 ## 5. 评分(纯函数)
@@ -154,7 +154,7 @@ function score(s: NodeState, now: number): number {
 | `NODE_TTL_SECONDS` | 172800 | 节点 state key TTL(2 天)|
 | `DEATH_THRESHOLD` | 20 | 连续失败死亡阈值 |
 | `REVIVAL_SECONDS` | 86400 | 死亡复活时长(24h)|
-| `TEST_URL` | https://www.google.com | 探测目标 |
+| `TEST_URL` | https://http://cp.cloudflare.com | 探测目标 |
 | `PROBE_TIMEOUT_MS` | 5000 | 单次探测超时 |
 | `SINGBOX_BASE_PORT` | 30000 | 本地 inbound 起始端口 |
 | `SINGBOX_BIN` | src/sing-box/sing-box | 二进制路径 |

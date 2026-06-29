@@ -1,0 +1,23 @@
+node_modules
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+.env
+.env.*
+coverage
+
+# 文档与流程文件（运行镜像不需要）
+docs
+openspec
+.codebuddy
+CLAUDE.md
+skills-lock.json
+
+# 开发/测试文件（运行镜像不需要）
+scripts
+src/**/*.test.ts
+
+# 非目标平台二进制，不打进 Linux 镜像
+src/sing-box/sing-box-mac

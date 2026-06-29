@@ -18,6 +18,7 @@ export interface InstanceParams {
   basePort: number;
   proxyInboundOffset: number;
   clashPort: number;
+  clashBindAddress?: string;
   clashSecret: string;
   testUrl?: string;
   readyTimeoutMs: number;
@@ -99,6 +100,7 @@ export class SingBoxInstance {
         basePort,
         proxyInboundOffset: this.params.proxyInboundOffset,
         clashPort,
+        clashBindAddress: this.params.clashBindAddress,
         clashSecret: this.params.clashSecret,
         testUrl: this.params.testUrl,
         exclude: this.params.exclude,

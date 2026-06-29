@@ -14,6 +14,7 @@ export interface MonitorOptions {
   };
   orchestrator?: { blueGreenSwap(newNodes: Node[]): Promise<boolean> };
   onBestChange?: (bestKey: string | null) => void;
+  debug?: boolean;
 }
 
 export class Monitor {
@@ -28,6 +29,11 @@ export class Monitor {
 
   constructor(private opts: MonitorOptions) {
     this.nodes = opts.nodes;
+  }
+
+  private debug(...args: unknown[]): void {
+    if (!this.opts.debug) return;
+    console.log('[monitor:debug]', ...args);
   }
 
   updateNodes(nodes: Node[]) {
@@ -96,9 +102,39 @@ export class Monitor {
     ]);
 
     this.latencyByKey = new Map(Object.entries(latencies));
+    const nonNullLatencyCount = Object.values(latencies).filter((v) => v !== null).length;
 
-    const parsed = this.parseBestKey(outbound);
+    let parsed = this.parseBestKey(outbound);
+    const parsedBeforeLatencyCheck = parsed;
+
+    this.debug('urltest snapshot', {
+      outbound,
+      parsed,
+      totalNodes: this.nodes.length,
+      latencyKeys: Object.keys(latencies).length,
+      nonNullLatencyCount,
+      previousBest: this.bestKey,
+    });
+
+    // If clash reports this node but urltest has no valid latency for it,
+    // treat it as unavailable and keep relay closed.
+    if (parsed && this.latencyByKey.has(parsed) && this.latencyByKey.get(parsed) === null) {
+      this.debug('best downgraded to null because selected node latency is null', {
+        key: parsed,
+        outbound,
+      });
+      parsed = null;
+    }
+
+    if (outbound && !parsedBeforeLatencyCheck) {
+      this.debug('outbound cannot be mapped to known node key/name', {
+        outbound,
+        nodeKeys: this.nodes.map((n) => n.key).slice(0, 8),
+      });
+    }
+
     if (parsed !== this.bestKey) {
+      this.debug('best changed', { from: this.bestKey, to: parsed });
       this.bestKey = parsed;
       this.opts.onBestChange?.(this.bestKey);
     }

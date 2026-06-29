@@ -1,13 +1,19 @@
-import type { Node } from '../types.ts';
-import { toOutbound } from './outbound.ts';
-import { allocatePorts } from './ports.ts';
+import type { Node } from "../types.ts";
+import { toOutbound } from "./outbound.ts";
+import { allocatePorts } from "./ports.ts";
 
 export interface SingBoxConfig {
-  log: { level: string };
+  log: { level: string, disabled: boolean,output: string, timestamp: boolean };
   inbounds: Record<string, unknown>[];
   outbounds: Record<string, unknown>[];
   route: { rules: Record<string, unknown>[] };
-  experimental: { clash_api: { external_controller: string; secret: string } };
+  experimental: {
+    clash_api: {
+      external_controller: string;
+      secret: string;
+      access_control_allow_private_network: boolean;
+    };
+  };
 }
 
 export interface BuildConfigParams {
@@ -15,6 +21,7 @@ export interface BuildConfigParams {
   basePort: number;
   proxyInboundOffset: number;
   clashPort: number;
+  clashBindAddress?: string;
   clashSecret: string;
   testUrl?: string;
   exclude?: Set<number>;
@@ -36,12 +43,15 @@ export interface BuildConfigResult {
  * - proxy-auto(urltest) over all node outbounds
  * - route in-proxy -> proxy-auto
  */
-export async function buildConfig(params: BuildConfigParams): Promise<BuildConfigResult> {
+export async function buildConfig(
+  params: BuildConfigParams,
+): Promise<BuildConfigResult> {
   const {
     nodes,
     basePort,
     proxyInboundOffset,
     clashPort,
+    clashBindAddress,
     clashSecret,
     testUrl,
     exclude,
@@ -56,41 +66,47 @@ export async function buildConfig(params: BuildConfigParams): Promise<BuildConfi
   const hasAuth = Boolean(proxyAuthUser && proxyAuthPass);
   const inbounds: Record<string, unknown>[] = [
     {
-      type: 'mixed',
-      tag: 'in-proxy',
-      listen: '127.0.0.1',
+      type: "mixed",
+      tag: "in-proxy",
+      listen: "127.0.0.1",
       listen_port: proxyInboundPort,
-      ...(hasAuth ? { users: [{ username: proxyAuthUser, password: proxyAuthPass }] } : {}),
+      ...(hasAuth
+        ? { users: [{ username: proxyAuthUser, password: proxyAuthPass }] }
+        : {}),
     },
   ];
 
   const nodeOutbounds = nodes.map((n) => `out-${n.key}`);
   const outbounds: Record<string, unknown>[] = [
-    ...nodes.map((n) => toOutbound(n)),
     {
-      type: 'urltest',
-      tag: 'proxy-auto',
-      outbounds: nodeOutbounds.length > 0 ? nodeOutbounds : ['block'],
-      url: testUrl ?? 'https://www.google.com',
-      interval: '3m',
+      type: "urltest",
+      tag: "proxy-auto",
+      outbounds: nodeOutbounds.length > 0 ? nodeOutbounds : ["block"],
+      url: testUrl ?? "https://cp.cloudflare.com",
+      interval: "3m",
       tolerance: 50,
-      idle_timeout: '30m',
+      idle_timeout: "30m",
       interrupt_exist_connections: false,
     },
-    { type: 'block', tag: 'block' },
+    { type: "block", tag: "block" },
+    ...nodes.map((n) => toOutbound(n)),
   ];
 
   const rules: Record<string, unknown>[] = [
-    { inbound: ['in-proxy'], outbound: 'proxy-auto' },
+    { inbound: ["in-proxy"], outbound: "proxy-auto" },
   ];
 
   const config: SingBoxConfig = {
-    log: { level: 'warn' },
+    log: { disabled: true, level: "debug", timestamp: true, output: "a.log" },
     inbounds,
     outbounds,
     route: { rules },
     experimental: {
-      clash_api: { external_controller: `127.0.0.1:${clashPort}`, secret: clashSecret },
+      clash_api: {
+        external_controller: `${clashBindAddress ?? "127.0.0.1"}:${clashPort}`,
+        secret: clashSecret,
+        access_control_allow_private_network: true,
+      },
     },
   };
 

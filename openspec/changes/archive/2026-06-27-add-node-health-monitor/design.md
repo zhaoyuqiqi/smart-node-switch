@@ -25,7 +25,7 @@
 
 - **HTTP 框架:Elysia**(用户指定)。运行于 Bun,原生 TS,路由声明式。替代 CLAUDE.md 默认的 `Bun.serve()` —— 用户显式要求优先。
 - **Redis 客户端:ioredis**(用户指定),替代 `Bun.redis`。
-- **代理内核:sing-box 子进程**。倾向「单实例多 inbound」:为每个节点分配一个本地 mixed/SOCKS 入站端口,各自路由到对应 outbound,启动一个常驻 sing-box 进程。健康检查 = 通过该节点的本地端口对测试 URL(默认 `https://www.google.com`)发请求,测得延迟与可用性。订阅变化时重新生成配置并重启。备选:每次检查临时拉起 sing-box(开销大,弃用)。最终编排细节在深度设计阶段定。
+- **代理内核:sing-box 子进程**。倾向「单实例多 inbound」:为每个节点分配一个本地 mixed/SOCKS 入站端口,各自路由到对应 outbound,启动一个常驻 sing-box 进程。健康检查 = 通过该节点的本地端口对测试 URL(默认 `https://http://cp.cloudflare.com`)发请求,测得延迟与可用性。订阅变化时重新生成配置并重启。备选:每次检查临时拉起 sing-box(开销大,弃用)。最终编排细节在深度设计阶段定。
 - **协议解析:四个独立 parser**(trojan/vmess/ss/vless URI → 统一内部 Node 结构 → sing-box outbound JSON)。vmess 通常为 base64(JSON),ss 为 `ss://base64@host:port` 或 SIP002,trojan/vless 为 URL 形式。
 - **节点状态存 Redis**:每个节点一个 key(由稳定标识派生,如 `protocol:server:port` 哈希),存 latency/failCount/lastCheck/successCount 等;dead 状态用带 24h TTL 的 key 表示,TTL 到期即自动复活。
 - **Redis TTL 治理**:节点状态 key 写入时设过期(默认 2 天),每次对该节点操作(读/写)时续期 2 天。这样持续被检测的节点保持存活,而订阅刷新后不再出现的旧节点会自然过期,避免 Redis 无限膨胀。注意与 dead key 的 24h TTL 相互独立。

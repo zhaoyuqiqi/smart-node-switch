@@ -44,6 +44,7 @@ export interface Config {
   proxyBindAddress: string;
   proxyPublicHost: string;
   clashApiBasePort: number;
+  clashApiBindAddress: string;
   clashApiSecret: string;
   singboxInstancePortStride: number;
   singboxProxyInboundOffset: number;
@@ -51,6 +52,7 @@ export interface Config {
   instanceReadyTimeoutMs: number;
   proxyAuthUser: string;
   proxyAuthPass: string;
+  debugMonitor: boolean;
 }
 
 // Generate node identity key: sha1(protocol|server|port|credential|transportParams).slice(0,16)

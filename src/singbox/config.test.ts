@@ -38,13 +38,13 @@ describe('buildConfig(urltest)', () => {
 
   it('adds urltest outbound over all node outbounds', async () => {
     const r = await buildConfig({
-      nodes: [node('a'), node('b')], basePort: 41200, proxyInboundOffset: 0, clashPort: 41960, clashSecret: 's', testUrl: 'https://www.google.com',
+      nodes: [node('a'), node('b')], basePort: 41200, proxyInboundOffset: 0, clashPort: 41960, clashSecret: 's', testUrl: 'https://http://cp.cloudflare.com',
     });
     const auto = r.config.outbounds.find((o) => o['tag'] === 'proxy-auto');
     expect(auto).toBeDefined();
     expect(auto!['type']).toBe('urltest');
     expect(auto!['outbounds']).toEqual(['out-a', 'out-b']);
-    expect(auto!['url']).toBe('https://www.google.com');
+    expect(auto!['url']).toBe('https://http://cp.cloudflare.com');
     expect(auto!['interrupt_exist_connections']).toBe(false);
   });
 
@@ -64,6 +64,18 @@ describe('buildConfig(urltest)', () => {
     expect(r.config.experimental.clash_api.external_controller).toBe('127.0.0.1:41980');
     expect(r.config.experimental.clash_api.secret).toBe('topsecret');
     expect(r.clashPort).toBe(41980);
+  });
+
+  it('supports exposing clash_api on all interfaces', async () => {
+    const r = await buildConfig({
+      nodes: [node('a')],
+      basePort: 41420,
+      proxyInboundOffset: 0,
+      clashPort: 41981,
+      clashBindAddress: '0.0.0.0',
+      clashSecret: 'topsecret',
+    });
+    expect(r.config.experimental.clash_api.external_controller).toBe('0.0.0.0:41981');
   });
 
   it('excludes occupied ports from allocation', async () => {
