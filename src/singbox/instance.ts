@@ -21,6 +21,7 @@ export interface InstanceParams {
   clashBindAddress?: string;
   clashSecret: string;
   testUrl?: string;
+  urltestInterval?: string;
   readyTimeoutMs: number;
   proxyAuthUser?: string;
   proxyAuthPass?: string;
@@ -103,6 +104,7 @@ export class SingBoxInstance {
         clashBindAddress: this.params.clashBindAddress,
         clashSecret: this.params.clashSecret,
         testUrl: this.params.testUrl,
+        urltestInterval: this.params.urltestInterval,
         exclude: this.params.exclude,
         proxyAuthUser: this.params.proxyAuthUser,
         proxyAuthPass: this.params.proxyAuthPass,

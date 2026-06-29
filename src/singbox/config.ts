@@ -24,6 +24,7 @@ export interface BuildConfigParams {
   clashBindAddress?: string;
   clashSecret: string;
   testUrl?: string;
+  urltestInterval?: string;
   exclude?: Set<number>;
   proxyAuthUser?: string;
   proxyAuthPass?: string;
@@ -54,6 +55,7 @@ export async function buildConfig(
     clashBindAddress,
     clashSecret,
     testUrl,
+    urltestInterval,
     exclude,
     proxyAuthUser,
     proxyAuthPass,
@@ -83,7 +85,7 @@ export async function buildConfig(
       tag: "proxy-auto",
       outbounds: nodeOutbounds.length > 0 ? nodeOutbounds : ["block"],
       url: testUrl ?? "https://cp.cloudflare.com",
-      interval: "3m",
+      interval: urltestInterval ?? "3m",
       tolerance: 50,
       idle_timeout: "30m",
       interrupt_exist_connections: false,

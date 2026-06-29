@@ -69,7 +69,8 @@ docker run --rm \
 | `CHECK_INTERVAL_SECONDS` | `30` | 轮询周期（秒） |
 | `REFRESH_THRESHOLD` | `0.1` | 可用性占比阈值（低于触发刷新） |
 | `REFRESH_COOLDOWN_SECONDS` | `300` | 刷新最小间隔（秒） |
-| `TEST_URL` | `https://http://cp.cloudflare.com` | `urltest` 探测目标 |
+| `TEST_URL` | `https://cp.cloudflare.com` | `urltest` 探测目标 |
+| `URLTEST_INTERVAL` | `3m` | `urltest` 轮询间隔（例如 `30s` / `1m`） |
 | `SINGBOX_BASE_PORT` | `30000` | sing-box 端口段起点 |
 | `SINGBOX_BIN` | mac: `src/sing-box/sing-box-mac` / Linux: `src/sing-box/sing-box-linux` | sing-box 二进制路径（可手动覆盖） |
 | `PROXY_PORT` | `8080` | 对外固定代理端口 |

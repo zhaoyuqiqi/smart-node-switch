@@ -15,7 +15,7 @@ async function main() {
   console.log(`[init] Fetching subscription from ${config.subscriptionUrl}`);
   const nodes = parseSubscription(await fetchSubscription(config.subscriptionUrl));
   console.log(`[init] Parsed ${nodes.length} nodes`);
-  console.log(`[init] config: SINGBOX_BIN=${config.singboxBin} TEST_URL=${config.testUrl} DEBUG_MONITOR=${config.debugMonitor}`);
+  console.log(`[init] config: SINGBOX_BIN=${config.singboxBin} TEST_URL=${config.testUrl} URLTEST_INTERVAL=${config.urltestInterval} DEBUG_MONITOR=${config.debugMonitor}`);
 
   // Instance factory: blue/green alternate base ports via stride.
   let instanceGen = 0;
@@ -34,6 +34,7 @@ async function main() {
       exclude,
       portStride: stride,
       testUrl: config.testUrl,
+      urltestInterval: config.urltestInterval,
       proxyAuthUser: config.proxyAuthUser,
       proxyAuthPass: config.proxyAuthPass,
     });

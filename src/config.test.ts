@@ -18,6 +18,7 @@ describe('loadConfig', () => {
     'PROXY_BIND_ADDRESS',
     'PROXY_PUBLIC_HOST',
     'CLASH_API_BASE_PORT',
+    'CLASH_API_BIND_ADDRESS',
     'CLASH_API_SECRET',
     'SINGBOX_INSTANCE_PORT_STRIDE',
     'SINGBOX_PROXY_INBOUND_OFFSET',
@@ -43,7 +44,7 @@ describe('loadConfig', () => {
     process.env['SUBSCRIPTION_URL'] = 'https://example.com/sub';
     const cfg = loadConfig();
     expect(cfg.subscriptionUrl).toBe('https://example.com/sub');
-    expect(cfg.checkIntervalSeconds).toBe(30);
+    expect(cfg.checkIntervalSeconds).toBe(60);
     expect(cfg.refreshThreshold).toBe(0.1);
     expect(cfg.refreshCooldownSeconds).toBe(300);
     expect(cfg.testUrl).toBe('https://cp.cloudflare.com');
@@ -57,9 +58,11 @@ describe('loadConfig', () => {
     process.env['SUBSCRIPTION_URL'] = 'https://example.com/sub';
     process.env['CHECK_INTERVAL_SECONDS'] = '60';
     process.env['REFRESH_THRESHOLD'] = '0.2';
+    process.env['URLTEST_INTERVAL'] = '45s';
     const cfg = loadConfig();
     expect(cfg.checkIntervalSeconds).toBe(60);
     expect(cfg.refreshThreshold).toBe(0.2);
+    expect(cfg.urltestInterval).toBe('45s');
   });
 
   it('loads new proxy/clash defaults', () => {

@@ -40,6 +40,34 @@ describe('GET /nodes', () => {
   });
 });
 
+describe('GET /nodes/available', () => {
+  it('returns only nodes with non-null latency in /nodes shape', async () => {
+    const a = makeNode('aaa');
+    const b = makeNode('bbb');
+    const c = makeNode('ccc');
+    const app = registerRoutes(new Elysia(), fakeMonitor([a, b, c], 'bbb', { aaa: null, bbb: 88, ccc: 180 }));
+    const res = await get(app, '/nodes/available');
+    const body = await res.json() as any;
+
+    expect(body.count).toBe(2);
+    expect(Array.isArray(body.nodes)).toBe(true);
+    expect(body.nodes.map((n: any) => n.key).sort()).toEqual(['bbb', 'ccc']);
+    expect(body.nodes.find((n: any) => n.key === 'bbb').isBest).toBe(true);
+    expect(body.nodes.find((n: any) => n.key === 'bbb').latencyMs).toBe(88);
+  });
+
+  it('returns empty list when all latencies are null', async () => {
+    const a = makeNode('aaa');
+    const b = makeNode('bbb');
+    const app = registerRoutes(new Elysia(), fakeMonitor([a, b], null, { aaa: null, bbb: null }));
+    const res = await get(app, '/nodes/available');
+    const body = await res.json() as any;
+
+    expect(body.count).toBe(0);
+    expect(body.nodes).toEqual([]);
+  });
+});
+
 describe('GET /nodes/best', () => {
   it('returns the current best node', async () => {
     const b = makeNode('bbb');

@@ -19,6 +19,12 @@ describe('parseTrojan', () => {
     expect(node!.raw['type']).toBe('ws');
   });
 
+  it('keeps allowInsecure as boolean for outbound mapping', () => {
+    const node = parseTrojan('trojan://pass@host.com:443?allowInsecure=1&sni=sni.host.com#n1');
+    expect(node).not.toBeNull();
+    expect(node!.raw['allowInsecure']).toBe(true);
+  });
+
   it('returns null for non-trojan URI', () => {
     expect(parseTrojan('vmess://xxx')).toBeNull();
     expect(parseTrojan('ss://xxx')).toBeNull();

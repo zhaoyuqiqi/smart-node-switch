@@ -38,6 +38,15 @@ export function registerRoutes(
     return { count: result.length, nodes: result };
   });
 
+  app.get('/nodes/available', async () => {
+    const nodes = monitor.getNodes();
+    const bestKey = monitor.getBestKey();
+    const result: NodeView[] = nodes
+      .map((node) => toView(node, bestKey, monitor.getLatency(node.key)))
+      .filter((node) => node.latencyMs !== null);
+    return { count: result.length, nodes: result };
+  });
+
   app.get('/nodes/best', async () => {
     const best = monitor.getBestNode();
     if (!best) return { best: null };

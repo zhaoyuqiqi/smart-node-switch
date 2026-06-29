@@ -19,6 +19,7 @@ export function loadConfig(): Config {
     refreshThreshold: Number(process.env['REFRESH_THRESHOLD'] ?? 0.1),
     refreshCooldownSeconds: Number(process.env['REFRESH_COOLDOWN_SECONDS'] ?? 300),
     testUrl: process.env['TEST_URL'] ?? 'https://cp.cloudflare.com',
+    urltestInterval: process.env['URLTEST_INTERVAL'] ?? '3m',
     singboxBasePort: Number(process.env['SINGBOX_BASE_PORT'] ?? 30000),
     singboxBin: process.env['SINGBOX_BIN'] ?? DEFAULT_SINGBOX_BIN,
     proxyPort: Number(process.env['PROXY_PORT'] ?? 8080),

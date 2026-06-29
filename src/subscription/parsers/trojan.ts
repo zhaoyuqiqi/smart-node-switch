@@ -26,11 +26,11 @@ export function parseTrojan(uri: string): Node | null {
       port,
       originalUri: uri,
       raw: {
+        ...Object.fromEntries(url.searchParams.entries()),
         password,
         sni: url.searchParams.get('sni') ?? url.searchParams.get('peer') ?? server,
         allowInsecure: url.searchParams.get('allowInsecure') === '1',
         type: url.searchParams.get('type') ?? 'tcp',
-        ...Object.fromEntries(url.searchParams.entries()),
       },
     };
   } catch {

@@ -45,7 +45,22 @@ describe('buildConfig(urltest)', () => {
     expect(auto!['type']).toBe('urltest');
     expect(auto!['outbounds']).toEqual(['out-a', 'out-b']);
     expect(auto!['url']).toBe('https://http://cp.cloudflare.com');
+    expect(auto!['interval']).toBe('3m');
     expect(auto!['interrupt_exist_connections']).toBe(false);
+  });
+
+  it('supports custom urltest interval from config', async () => {
+    const r = await buildConfig({
+      nodes: [node('a'), node('b')],
+      basePort: 41220,
+      proxyInboundOffset: 0,
+      clashPort: 41961,
+      clashSecret: 's',
+      urltestInterval: '45s',
+    });
+    const auto = r.config.outbounds.find((o) => o['tag'] === 'proxy-auto');
+    expect(auto).toBeDefined();
+    expect(auto!['interval']).toBe('45s');
   });
 
   it('routes in-proxy to proxy-auto', async () => {

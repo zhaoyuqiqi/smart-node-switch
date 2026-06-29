@@ -38,6 +38,7 @@ export interface Config {
   refreshThreshold: number;
   refreshCooldownSeconds: number;
   testUrl: string;
+  urltestInterval: string;
   singboxBasePort: number;
   singboxBin: string;
   proxyPort: number;
