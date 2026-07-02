@@ -41,8 +41,9 @@ export interface BuildConfigResult {
 /**
  * Build sing-box config for one instance:
  * - fixed in-proxy mixed inbound
- * - proxy-auto(urltest) over all node outbounds
- * - route in-proxy -> proxy-auto
+ * - proxy-auto(urltest) over all node outbounds, only for RTT probing
+ * - proxy-select(selector) used as real egress and controlled by API setSelector
+ * - route in-proxy -> proxy-select
  */
 export async function buildConfig(
   params: BuildConfigParams,
@@ -79,15 +80,24 @@ export async function buildConfig(
   ];
 
   const nodeOutbounds = nodes.map((n) => `out-${n.key}`);
+  const effectiveOutbounds = nodeOutbounds.length > 0 ? nodeOutbounds : ["block"];
+
   const outbounds: Record<string, unknown>[] = [
     {
       type: "urltest",
       tag: "proxy-auto",
-      outbounds: nodeOutbounds.length > 0 ? nodeOutbounds : ["block"],
+      outbounds: effectiveOutbounds,
       url: testUrl ?? "https://cp.cloudflare.com",
       interval: urltestInterval ?? "3m",
       tolerance: 50,
       idle_timeout: "30m",
+      interrupt_exist_connections: false,
+    },
+    {
+      type: "selector",
+      tag: "proxy-select",
+      outbounds: effectiveOutbounds,
+      default: effectiveOutbounds[0],
       interrupt_exist_connections: false,
     },
     { type: "block", tag: "block" },
@@ -95,7 +105,7 @@ export async function buildConfig(
   ];
 
   const rules: Record<string, unknown>[] = [
-    { inbound: ["in-proxy"], outbound: "proxy-auto" },
+    { inbound: ["in-proxy"], outbound: "proxy-select" },
   ];
 
   const config: SingBoxConfig = {

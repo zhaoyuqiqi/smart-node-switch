@@ -1,11 +1,12 @@
 # smart-node-switch
 
-一个基于 Bun + Elysia + sing-box 的代理网关服务：自动拉取订阅节点，使用 sing-box 原生 `urltest` 自动选优，并通过固定代理端口对外提供稳定访问。
+一个基于 Bun + Elysia + sing-box 的代理网关服务：自动拉取订阅节点，使用 sing-box `urltest` 采集 RTT，再由服务端评分系统选择最优节点，并通过固定代理端口对外提供稳定访问。
 
 ## 功能
 
 - 支持 `trojan` / `vmess` / `ss` / `vless` 订阅解析
-- 使用 sing-box 原生 `urltest` 自动选择当前最优节点
+- 使用 sing-box 原生 `urltest` 采集节点 RTT（不直接自动切换）
+- 内置评分系统（成功率/中位 RTT/P95/Jitter/连续失败）选择出口节点
 - 固定代理入口（`PROXY_PORT`）+ 蓝绿实例切换，刷新期间已建立连接不中断
 - 支持可选代理账号密码鉴权（`PROXY_AUTH_USER` + `PROXY_AUTH_PASS`）
 - 当无可用节点时，`GET /proxy` 返回 `503`，relay 拒绝新连接
@@ -69,8 +70,10 @@ docker run --rm \
 | `CHECK_INTERVAL_SECONDS` | `30` | 轮询周期（秒） |
 | `REFRESH_THRESHOLD` | `0.1` | 可用性占比阈值（低于触发刷新） |
 | `REFRESH_COOLDOWN_SECONDS` | `300` | 刷新最小间隔（秒） |
-| `TEST_URL` | `https://cp.cloudflare.com` | `urltest` 探测目标 |
-| `URLTEST_INTERVAL` | `3m` | `urltest` 轮询间隔（例如 `30s` / `1m`） |
+| `TEST_URL` | `https://cp.cloudflare.com` | 主动探测与 `urltest` 的探测目标 |
+| `URLTEST_INTERVAL` | `3m` | sing-box 内置 `urltest` 轮询间隔（例如 `30s` / `1m`） |
+| `PROBE_TIMEOUT_MS` | `5000` | 主动探测单节点超时（毫秒） |
+| `ACTIVE_PROBE_INTERVAL_SECONDS` | `60` | 主动探测触发间隔（秒），默认每 1 分钟触发一次 |
 | `SINGBOX_BASE_PORT` | `30000` | sing-box 端口段起点 |
 | `SINGBOX_BIN` | mac: `src/sing-box/sing-box-mac` / Linux: `src/sing-box/sing-box-linux` | sing-box 二进制路径（可手动覆盖） |
 | `PROXY_PORT` | `8080` | 对外固定代理端口 |
@@ -85,7 +88,10 @@ docker run --rm \
 | `SINGBOX_PROXY_INBOUND_OFFSET` | `0` | in-proxy 端口偏移 |
 | `MAX_DRAIN_SECONDS` | `300` | 蓝绿切换旧实例最大排空时长 |
 | `INSTANCE_READY_TIMEOUT_MS` | `8000` | 新实例就绪超时 |
-| `DEBUG_MONITOR` | `false` | 打印 urltest 选优诊断日志（`1/true` 开启） |
+| `DEBUG_MONITOR` | `false` | 打印评分/测速诊断日志（`1/true` 开启） |
+| `REDIS_URL` | `redis://127.0.0.1:6379` | Redis 连接地址（用于保存节点 RTT 与统计） |
+| `REDIS_KEY_PREFIX` | `sns:node-metrics` | Redis key 前缀 |
+| `REDIS_NODE_TTL_SECONDS` | `21600` | 每个节点 RTT 列表与统计 Hash 的过期时间（秒，默认 6 小时，写入时自动续期） |
 
 ## 运行
 
@@ -99,7 +105,7 @@ SUBSCRIPTION_URL=https://your.sub/link bun run src/index.ts
 
 ### `GET /nodes`
 
-返回当前节点列表（运行时内存状态），包含 `isBest` 标记和 `latencyMs`（最近一次 urltest 延迟，毫秒；无数据时为 `null`）。
+返回当前节点列表（运行时内存状态），包含 `isBest`、`latencyMs`（最近一次 urltest RTT，毫秒；无数据时为 `null`）、`score` 和 `statistics`（统计信息）。
 
 示例：
 
@@ -124,7 +130,7 @@ SUBSCRIPTION_URL=https://your.sub/link bun run src/index.ts
 
 ### `GET /nodes/best`
 
-返回当前 urltest 选中的最优节点；没有可用节点时返回 `{ "best": null }`。
+返回当前评分系统选中的最优节点；没有可用节点时返回 `{ "best": null }`。
 
 ### `GET /proxy`
 

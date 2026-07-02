@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { Monitor } from './monitor.ts';
 import type { Node } from './types.ts';
+import type { NodeMetricsStore } from './node-metrics-store.ts';
 
 function makeNode(key: string): Node {
   return {
@@ -14,11 +15,12 @@ function makeNode(key: string): Node {
   };
 }
 
-describe('Monitor(urltest)', () => {
-  it('syncs best key from clash urltest group', async () => {
+describe('Monitor(score-selector)', () => {
+  it('picks best by score and calls setSelector', async () => {
     const a = makeNode('aaa');
     const b = makeNode('bbb');
-    const changed: Array<string | null> = [];
+    const setCalls: string[] = [];
+
     const monitor = new Monitor({
       refresh: async () => [a, b],
       nodes: [a, b],
@@ -26,55 +28,18 @@ describe('Monitor(urltest)', () => {
       refreshThreshold: 0.1,
       refreshCooldownSeconds: 9999,
       clash: {
-        async getCurrentOutbound() { return 'out-bbb'; },
-        async getNodeLatencies() { return { aaa: 210, bbb: 95 }; },
+        async setSelector(tag) { setCalls.push(tag); },
+        async getNodeLatencies() { return { aaa: 180, bbb: 95 }; },
       },
-      onBestChange: (k) => changed.push(k),
     });
 
     await monitor.runRound();
     expect(monitor.getBestKey()).toBe('bbb');
     expect(monitor.getBestNode()?.key).toBe('bbb');
-    expect(monitor.getLatency('aaa')).toBe(210);
-    expect(monitor.getLatency('bbb')).toBe(95);
-    expect(changed.at(-1)).toBe('bbb');
+    expect(setCalls.at(-1)).toBe('out-bbb');
   });
 
-  it('accepts plain node key from clash as current outbound', async () => {
-    const a = makeNode('aaa');
-    const b = makeNode('bbb');
-    const monitor = new Monitor({
-      refresh: async () => [a, b],
-      nodes: [a, b],
-      intervalSeconds: 9999,
-      refreshThreshold: 0.1,
-      refreshCooldownSeconds: 9999,
-      clash: { async getCurrentOutbound() { return 'bbb'; } },
-    });
-
-    await monitor.runRound();
-    expect(monitor.getBestKey()).toBe('bbb');
-    expect(monitor.getBestNode()?.key).toBe('bbb');
-  });
-
-  it('accepts node name from clash as current outbound', async () => {
-    const a = makeNode('aaa');
-    const b = makeNode('bbb');
-    const monitor = new Monitor({
-      refresh: async () => [a, b],
-      nodes: [a, b],
-      intervalSeconds: 9999,
-      refreshThreshold: 0.1,
-      refreshCooldownSeconds: 9999,
-      clash: { async getCurrentOutbound() { return 'Node-bbb'; } },
-    });
-
-    await monitor.runRound();
-    expect(monitor.getBestKey()).toBe('bbb');
-    expect(monitor.getBestNode()?.key).toBe('bbb');
-  });
-
-  it('sets best null when urltest returns unknown outbound', async () => {
+  it('stores timeout as -1 and sets score to 0 for latest timeout node', async () => {
     const a = makeNode('aaa');
     const monitor = new Monitor({
       refresh: async () => [a],
@@ -82,113 +47,146 @@ describe('Monitor(urltest)', () => {
       intervalSeconds: 9999,
       refreshThreshold: 0.1,
       refreshCooldownSeconds: 9999,
-      clash: { async getCurrentOutbound() { return 'out-not-exist'; } },
+      clash: {
+        async setSelector() {},
+        async getNodeLatencies() { return { aaa: null }; },
+      },
     });
 
     await monitor.runRound();
     expect(monitor.getBestKey()).toBeNull();
-    expect(monitor.getBestNode()).toBeNull();
+    expect(monitor.getLatency('aaa')).toBeNull();
+    expect(monitor.getScore('aaa')).toBe(0);
+    expect(monitor.getStatistics('aaa')?.currentRtt).toBe(-1);
   });
 
-  it('sets best null when selected outbound has null latency', async () => {
+  it('applies -30 penalty when previous round was timeout and current recovers', async () => {
     const a = makeNode('aaa');
-    const b = makeNode('bbb');
     const monitor = new Monitor({
-      refresh: async () => [a, b],
-      nodes: [a, b],
+      refresh: async () => [a],
+      nodes: [a],
       intervalSeconds: 9999,
       refreshThreshold: 0.1,
       refreshCooldownSeconds: 9999,
       clash: {
-        async getCurrentOutbound() { return 'out-bbb'; },
-        async getNodeLatencies() { return { aaa: 120, bbb: null }; },
+        async setSelector() {},
+        async getNodeLatencies() { return { aaa: null }; },
       },
     });
 
     await monitor.runRound();
+
+    const monitor2 = monitor as unknown as { opts: { clash: { getNodeLatencies?: () => Promise<Record<string, number | null>> } } };
+    monitor2.opts.clash.getNodeLatencies = async () => ({ aaa: 120 });
+
+    await monitor.runRound();
+    // 由于最近 2 次成功率仅 50%，触发低成功率熔断，得分应为 0。
     expect(monitor.getBestKey()).toBeNull();
-    expect(monitor.getBestNode()).toBeNull();
+    expect(monitor.getScore('aaa')).toBe(0);
   });
 
-  it('triggers refresh when no best and threshold is breached', async () => {
-    const oldNodes = [makeNode('old')];
-    const newNodes = [makeNode('new')];
+  it('triggers refresh when score>=60 nodes ratio drops below 10%', async () => {
+    const nodes = [makeNode('a1'), makeNode('a2'), makeNode('a3'), makeNode('a4'), makeNode('a5'), makeNode('a6'), makeNode('a7'), makeNode('a8'), makeNode('a9'), makeNode('a10')];
     let refreshCalled = false;
+
     const monitor = new Monitor({
       refresh: async () => {
         refreshCalled = true;
-        return newNodes;
+        return nodes;
       },
-      nodes: oldNodes,
+      nodes,
       intervalSeconds: 9999,
-      refreshThreshold: 0.5,
+      refreshThreshold: 0.1,
       refreshCooldownSeconds: 0,
       clash: {
-        async getCurrentOutbound() {
-          // first sync: no best; after refresh still no best for this test
-          return null;
+        async setSelector() {},
+        async getNodeLatencies() {
+          // only 1 node healthy(>=60) out of 10 => exactly 10%, not trigger; all timeout then trigger
+          return Object.fromEntries(nodes.map((n) => [n.key, null]));
         },
       },
     });
 
     await monitor.runRound();
     expect(refreshCalled).toBe(true);
-    expect(monitor.getNodes().map((n) => n.key)).toEqual(['new']);
   });
 
-  it('calls blueGreenSwap when refreshed node set changes', async () => {
-    const oldNodes = [makeNode('o1'), makeNode('o2')];
-    const newNodes = [makeNode('n1'), makeNode('n2')];
-    let swappedWith: Node[] | null = null;
+  it('prunes internal maps to current subscription node keys only', async () => {
+    const oldNode = makeNode('old');
+    const newNode = makeNode('new');
 
     const monitor = new Monitor({
-      refresh: async () => newNodes,
-      nodes: oldNodes,
+      refresh: async () => [oldNode],
+      nodes: [oldNode],
       intervalSeconds: 9999,
-      refreshThreshold: 0.5,
+      refreshThreshold: 0.1,
+      refreshCooldownSeconds: 9999,
+      clash: {
+        async setSelector() {},
+        async getNodeLatencies() { return { old: 110 }; },
+      },
+    });
+
+    await monitor.runRound();
+    expect(monitor.getStatistics('old')).not.toBeNull();
+
+    monitor.updateNodes([newNode]);
+
+    expect(monitor.getStatistics('old')).toBeNull();
+    expect(monitor.getScore('old')).toBe(0);
+    expect(monitor.getLatency('old')).toBeNull();
+  });
+
+  it('does not emit transient null best during successful refresh swap', async () => {
+    const oldNode = makeNode('old');
+    const newNode = makeNode('new');
+    const bestChanges: Array<string | null> = [];
+
+    let active: 'old' | 'new' = 'old';
+
+    const monitor = new Monitor({
+      refresh: async () => [newNode],
+      nodes: [oldNode],
+      intervalSeconds: 9999,
+      refreshThreshold: 1,
       refreshCooldownSeconds: 0,
-      clash: { async getCurrentOutbound() { return null; } },
+      clash: {
+        async setSelector() {},
+        async getNodeLatencies() {
+          if (active === 'old') return { old: 100, new: null };
+          return { old: null, new: 90 };
+        },
+      },
       orchestrator: {
-        async blueGreenSwap(nodes) {
-          swappedWith = nodes;
+        async blueGreenSwap() {
+          active = 'new';
           return true;
         },
       },
+      onBestChange: (k) => bestChanges.push(k),
     });
 
     await monitor.runRound();
-    expect(swappedWith).not.toBeNull();
-    const swappedKeys = (swappedWith ?? []).map((n: Node) => n.key).sort();
-    expect(swappedKeys).toEqual(['n1', 'n2']);
-    expect(monitor.getNodes().map((n) => n.key).sort()).toEqual(['n1', 'n2']);
+
+    expect(bestChanges).toContain('old');
+    expect(bestChanges).toContain('new');
+    expect(bestChanges).not.toContain(null);
+    expect(monitor.getBestKey()).toBe('new');
   });
 
-  it('keeps old nodes when blueGreenSwap fails', async () => {
-    const oldNodes = [makeNode('o1'), makeNode('o2')];
-    const newNodes = [makeNode('n1'), makeNode('n2')];
-
-    const monitor = new Monitor({
-      refresh: async () => newNodes,
-      nodes: oldNodes,
-      intervalSeconds: 9999,
-      refreshThreshold: 0.5,
-      refreshCooldownSeconds: 0,
-      clash: { async getCurrentOutbound() { return null; } },
-      orchestrator: {
-        async blueGreenSwap() {
-          return false;
-        },
-      },
-    });
-
-    await monitor.runRound();
-    expect(monitor.getNodes().map((n) => n.key).sort()).toEqual(['o1', 'o2']);
-  });
-
-  it('warm-up sync gets best quickly even when first probe is null', async () => {
+  it('hydrates history from metricsStore and uses it in scoring', async () => {
     const a = makeNode('aaa');
     const b = makeNode('bbb');
-    let calls = 0;
+    const setCalls: string[] = [];
+
+    const metricsStore = {
+      async readRecentSamples(key: string) {
+        if (key === 'aaa') return [120, 110, 130, 125];
+        return [];
+      },
+      async record() {},
+    } as unknown as NodeMetricsStore;
+
     const monitor = new Monitor({
       refresh: async () => [a, b],
       nodes: [a, b],
@@ -196,17 +194,115 @@ describe('Monitor(urltest)', () => {
       refreshThreshold: 0.1,
       refreshCooldownSeconds: 9999,
       clash: {
-        async getCurrentOutbound() {
-          calls += 1;
-          if (calls === 1) return null;
-          return 'out-bbb';
-        },
+        async setSelector(tag) { setCalls.push(tag); },
+        async getNodeLatencies() { return { aaa: 180, bbb: 80 }; },
       },
+      metricsStore,
     });
 
     await monitor.start();
     monitor.stop();
-    expect(monitor.getBestKey()).toBe('bbb');
-    expect(calls).toBeGreaterThanOrEqual(2);
+
+    // 若不回填，bbb 会因当前 RTT 更低被选中；回填后 aaa 样本达到 5 个，不再受 sampleCount<5 的中性分限制。
+    expect(monitor.getBestKey()).toBe('aaa');
+    expect(monitor.getScore('aaa')).toBeGreaterThan(50);
+    expect(setCalls.at(-1)).toBe('out-aaa');
+  });
+
+  it('uses new samples only: unchanged latency snapshot should not re-record or re-select', async () => {
+    const a = makeNode('aaa');
+    const b = makeNode('bbb');
+    const setCalls: string[] = [];
+    const recorded: Array<{ key: string; rtt: number }> = [];
+
+    const metricsStore = {
+      async readRecentSamples() { return []; },
+      async record(key: string, rtt: number) {
+        recorded.push({ key, rtt });
+      },
+    } as unknown as NodeMetricsStore;
+
+    const monitor = new Monitor({
+      refresh: async () => [a, b],
+      nodes: [a, b],
+      intervalSeconds: 9999,
+      refreshThreshold: 0.1,
+      refreshCooldownSeconds: 9999,
+      clash: {
+        async setSelector(tag) { setCalls.push(tag); },
+        async getNodeLatencies() { return { aaa: 100, bbb: 110 }; },
+      },
+      metricsStore,
+    });
+
+    await monitor.runRound();
+    const firstScore = monitor.getScore('aaa');
+
+    await monitor.runRound(true);
+
+    expect(setCalls).toEqual(['out-aaa']);
+    expect(recorded.length).toBe(2);
+    expect(monitor.getScore('aaa')).toBe(firstScore);
+  });
+
+  it('requests active probe latencies with configured probe params', async () => {
+    const a = makeNode('aaa');
+    const seen: Array<{ activeProbe?: boolean; probeUrl?: string; probeTimeoutMs?: number }> = [];
+
+    const monitor = new Monitor({
+      refresh: async () => [a],
+      nodes: [a],
+      intervalSeconds: 9999,
+      refreshThreshold: 0.1,
+      refreshCooldownSeconds: 9999,
+      probeUrl: 'https://www.google.com/generate_204',
+      probeTimeoutMs: 4000,
+      clash: {
+        async setSelector() {},
+        async getNodeLatencies(opts) {
+          seen.push(opts ?? {});
+          return { aaa: 100 };
+        },
+      },
+    });
+
+    await monitor.runRound();
+
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen[0]).toEqual({
+      activeProbe: true,
+      probeUrl: 'https://www.google.com/generate_204',
+      probeTimeoutMs: 4000,
+    });
+  });
+
+  it('throttles active probe by activeProbeIntervalSeconds', async () => {
+    const a = makeNode('aaa');
+    const seen: Array<{ activeProbe?: boolean; probeUrl?: string; probeTimeoutMs?: number }> = [];
+    let call = 0;
+
+    const monitor = new Monitor({
+      refresh: async () => [a],
+      nodes: [a],
+      intervalSeconds: 9999,
+      refreshThreshold: 0.1,
+      refreshCooldownSeconds: 9999,
+      activeProbeIntervalSeconds: 60,
+      clash: {
+        async setSelector() {},
+        async getNodeLatencies(opts) {
+          call += 1;
+          seen.push(opts ?? {});
+          return { aaa: 100 + call };
+        },
+      },
+    });
+
+    await monitor.runRound();
+    await monitor.runRound(true);
+
+    expect(seen.length).toBe(2);
+    expect(seen[0]?.activeProbe).toBe(true);
+    expect(seen[1]?.activeProbe).toBe(false);
   });
 });

@@ -12,6 +12,8 @@ describe('loadConfig', () => {
     'REFRESH_THRESHOLD',
     'REFRESH_COOLDOWN_SECONDS',
     'TEST_URL',
+    'PROBE_TIMEOUT_MS',
+    'ACTIVE_PROBE_INTERVAL_SECONDS',
     'SINGBOX_BASE_PORT',
     'SINGBOX_BIN',
     'PROXY_PORT',
@@ -25,6 +27,9 @@ describe('loadConfig', () => {
     'MAX_DRAIN_SECONDS',
     'INSTANCE_READY_TIMEOUT_MS',
     'DEBUG_MONITOR',
+    'REDIS_URL',
+    'REDIS_KEY_PREFIX',
+    'REDIS_NODE_TTL_SECONDS',
   ];
 
   beforeEach(() => {
@@ -48,6 +53,8 @@ describe('loadConfig', () => {
     expect(cfg.refreshThreshold).toBe(0.1);
     expect(cfg.refreshCooldownSeconds).toBe(300);
     expect(cfg.testUrl).toBe('https://cp.cloudflare.com');
+    expect(cfg.probeTimeoutMs).toBe(5000);
+    expect(cfg.activeProbeIntervalSeconds).toBe(60);
     expect(cfg.singboxBasePort).toBe(30000);
     const expectedDefaultBin =
       process.platform === 'darwin' ? 'src/sing-box/sing-box-mac' : 'src/sing-box/sing-box-linux';
@@ -59,10 +66,12 @@ describe('loadConfig', () => {
     process.env['CHECK_INTERVAL_SECONDS'] = '60';
     process.env['REFRESH_THRESHOLD'] = '0.2';
     process.env['URLTEST_INTERVAL'] = '45s';
+    process.env['PROBE_TIMEOUT_MS'] = '3500';
     const cfg = loadConfig();
     expect(cfg.checkIntervalSeconds).toBe(60);
     expect(cfg.refreshThreshold).toBe(0.2);
     expect(cfg.urltestInterval).toBe('45s');
+    expect(cfg.probeTimeoutMs).toBe(3500);
   });
 
   it('loads new proxy/clash defaults', () => {
@@ -80,6 +89,9 @@ describe('loadConfig', () => {
     expect(cfg.maxDrainSeconds).toBe(300);
     expect(cfg.instanceReadyTimeoutMs).toBe(8000);
     expect(cfg.debugMonitor).toBe(false);
+    expect(cfg.redisUrl).toBe('redis://127.0.0.1:6379');
+    expect(cfg.redisKeyPrefix).toBe('sns:node-metrics');
+    expect(cfg.redisNodeTtlSeconds).toBe(21600);
   });
 
   it('overrides new proxy/clash config from env', () => {
@@ -90,6 +102,9 @@ describe('loadConfig', () => {
     process.env['PROXY_AUTH_USER'] = 'demo-user';
     process.env['PROXY_AUTH_PASS'] = 'demo-pass';
     process.env['DEBUG_MONITOR'] = '1';
+    process.env['REDIS_URL'] = 'redis://127.0.0.1:6380';
+    process.env['REDIS_KEY_PREFIX'] = 'custom:prefix';
+    process.env['REDIS_NODE_TTL_SECONDS'] = '3600';
     const cfg = loadConfig();
     expect(cfg.proxyPort).toBe(18080);
     expect(cfg.clashApiSecret).toBe('fixed-secret');
@@ -97,6 +112,9 @@ describe('loadConfig', () => {
     expect(cfg.proxyAuthUser).toBe('demo-user');
     expect(cfg.proxyAuthPass).toBe('demo-pass');
     expect(cfg.debugMonitor).toBe(true);
+    expect(cfg.redisUrl).toBe('redis://127.0.0.1:6380');
+    expect(cfg.redisKeyPrefix).toBe('custom:prefix');
+    expect(cfg.redisNodeTtlSeconds).toBe(3600);
   });
 });
 
@@ -136,6 +154,17 @@ describe('extended types', () => {
       key: 'k', name: 'n', protocol: 'trojan', server: 's', port: 443,
       isBest: true,
       latencyMs: 42,
+      score: 90,
+      statistics: {
+        currentRtt: 42,
+        avgRtt: 42,
+        medianRtt: 42,
+        p95Rtt: 42,
+        jitter: 0,
+        successRate: 100,
+        consecutiveFailure: 0,
+        sampleCount: 1,
+      },
       raw: { password: 'p' }, originalUri: 'trojan://x',
     };
     expect(v.raw['password']).toBe('p');

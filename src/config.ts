@@ -10,6 +10,7 @@ export function loadConfig(): Config {
   if (!subscriptionUrl) {
     throw new Error('SUBSCRIPTION_URL is required but not set');
   }
+  const redisUrl = process.env['REDIS_URL'] ?? 'redis://127.0.0.1:6379';
 
   const debugMonitor = process.env['DEBUG_MONITOR'] === '1' || process.env['DEBUG_MONITOR'] === 'true';
 
@@ -20,6 +21,8 @@ export function loadConfig(): Config {
     refreshCooldownSeconds: Number(process.env['REFRESH_COOLDOWN_SECONDS'] ?? 300),
     testUrl: process.env['TEST_URL'] ?? 'https://cp.cloudflare.com',
     urltestInterval: process.env['URLTEST_INTERVAL'] ?? '3m',
+    probeTimeoutMs: Number(process.env['PROBE_TIMEOUT_MS'] ?? 5000),
+    activeProbeIntervalSeconds: Number(process.env['ACTIVE_PROBE_INTERVAL_SECONDS'] ?? 60),
     singboxBasePort: Number(process.env['SINGBOX_BASE_PORT'] ?? 30000),
     singboxBin: process.env['SINGBOX_BIN'] ?? DEFAULT_SINGBOX_BIN,
     proxyPort: Number(process.env['PROXY_PORT'] ?? 8080),
@@ -35,5 +38,8 @@ export function loadConfig(): Config {
     proxyAuthUser: process.env['PROXY_AUTH_USER'] ?? '',
     proxyAuthPass: process.env['PROXY_AUTH_PASS'] ?? '',
     debugMonitor,
+    redisUrl,
+    redisKeyPrefix: process.env['REDIS_KEY_PREFIX'] ?? 'sns:node-metrics',
+    redisNodeTtlSeconds: Number(process.env['REDIS_NODE_TTL_SECONDS'] ?? 21600),
   };
 }

@@ -7,6 +7,13 @@ export function clashBaseUrl(port: number): string {
   return `http://127.0.0.1:${port}`;
 }
 
+export interface GetNodeLatenciesOptions {
+  activeProbe?: boolean;
+  probeUrl?: string;
+  probeTimeoutMs?: number;
+  probeConcurrency?: number;
+}
+
 export class ClashClient {
   constructor(
     private readonly baseUrl: string,
@@ -94,6 +101,51 @@ export class ClashClient {
     return null;
   }
 
+  private extractOutboundTags(proxies: Record<string, unknown>): string[] {
+    return Object.keys(proxies).filter((tag) => tag.startsWith('out-'));
+  }
+
+  private async fetchProxiesSnapshot(timeoutMs = 1500): Promise<Record<string, unknown> | null> {
+    const res = await this.fetchWithAuth('/proxies', {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (res.status < 200 || res.status >= 300) {
+      return null;
+    }
+    const body = await res.json() as { proxies?: Record<string, unknown> };
+    return body.proxies ?? {};
+  }
+
+  private async probeOutboundDelay(tag: string, probeUrl: string, probeTimeoutMs: number): Promise<void> {
+    const path = `/proxies/${encodeURIComponent(tag)}/delay?url=${encodeURIComponent(probeUrl)}&timeout=${probeTimeoutMs}`;
+    try {
+      const res = await this.fetchWithAuth(path, {
+        signal: AbortSignal.timeout(probeTimeoutMs + 1000),
+      });
+      if (res.status < 200 || res.status >= 300) {
+        this.debug('delay probe non-2xx', { tag, status: res.status });
+      }
+    } catch (error) {
+      this.debug('delay probe failed', {
+        tag,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private async activeProbeOutbounds(tags: string[], options: GetNodeLatenciesOptions): Promise<void> {
+    if (tags.length === 0) return;
+
+    const probeUrl = options.probeUrl ?? 'https://cp.cloudflare.com';
+    const probeTimeoutMs = Math.max(1000, options.probeTimeoutMs ?? 5000);
+    const probeConcurrency = Math.max(1, options.probeConcurrency ?? 8);
+
+    for (let i = 0; i < tags.length; i += probeConcurrency) {
+      const chunk = tags.slice(i, i + probeConcurrency);
+      await Promise.allSettled(chunk.map((tag) => this.probeOutboundDelay(tag, probeUrl, probeTimeoutMs)));
+    }
+  }
+
   /** Read current selected outbound tag from a selector/urltest proxy group. */
   async getCurrentOutbound(groupTag: string): Promise<string | null> {
     try {
@@ -134,30 +186,29 @@ export class ClashClient {
     }
   }
 
-  async getNodeLatencies(): Promise<Record<string, number | null>> {
+  async getNodeLatencies(options: GetNodeLatenciesOptions = {}): Promise<Record<string, number | null>> {
     try {
-      const res = await this.fetchWithAuth('/proxies', {
-        signal: AbortSignal.timeout(1500),
-      });
-      if (res.status < 200 || res.status >= 300) {
-        this.debug('GET /proxies non-2xx in getNodeLatencies', { status: res.status });
+      let proxies = await this.fetchProxiesSnapshot();
+      if (!proxies) {
+        this.debug('GET /proxies non-2xx in getNodeLatencies');
         return {};
       }
-      const body = await res.json() as { proxies?: Record<string, unknown> };
-      this.debug('GET /proxies response (for latencies)', body);
-      const proxies = body.proxies ?? {};
+
+      if (options.activeProbe) {
+        const tags = this.extractOutboundTags(proxies);
+        await this.activeProbeOutbounds(tags, options);
+        const refreshed = await this.fetchProxiesSnapshot();
+        if (refreshed) {
+          proxies = refreshed;
+        }
+      }
+
       const result: Record<string, number | null> = {};
       for (const [tag, payload] of Object.entries(proxies)) {
         if (!tag.startsWith('out-')) continue;
         const key = tag.slice(4);
         result[key] = this.extractLatestDelayMs(payload);
       }
-      const nonNullLatencyCount = Object.values(result).filter((v) => v !== null).length;
-      this.debug('parsed latency snapshot', {
-        outbounds: Object.keys(result).length,
-        nonNullLatencyCount,
-        latencies: result,
-      });
       return result;
     } catch (error) {
       this.debug('getNodeLatencies error', {

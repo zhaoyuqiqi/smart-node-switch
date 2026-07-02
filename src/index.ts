@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia';
+import Redis from 'ioredis';
 import { loadConfig } from './config.ts';
 import { SingBoxInstance } from './singbox/instance.ts';
 import { InstanceOrchestrator } from './singbox/orchestrator.ts';
@@ -7,6 +8,7 @@ import { fetchSubscription } from './subscription/fetch.ts';
 import { parseSubscription } from './subscription/parse.ts';
 import { Monitor } from './monitor.ts';
 import { registerRoutes } from './api.ts';
+import { NodeMetricsStore } from './node-metrics-store.ts';
 import type { Node } from './types.ts';
 
 async function main() {
@@ -16,6 +18,31 @@ async function main() {
   const nodes = parseSubscription(await fetchSubscription(config.subscriptionUrl));
   console.log(`[init] Parsed ${nodes.length} nodes`);
   console.log(`[init] config: SINGBOX_BIN=${config.singboxBin} TEST_URL=${config.testUrl} URLTEST_INTERVAL=${config.urltestInterval} DEBUG_MONITOR=${config.debugMonitor}`);
+
+  let redis: Redis | null = null;
+  let metricsStore: NodeMetricsStore | undefined;
+  try {
+    redis = new Redis(config.redisUrl, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: true,
+      enableOfflineQueue: false,
+    });
+    await redis.connect();
+    metricsStore = new NodeMetricsStore({
+      redis,
+      keyPrefix: config.redisKeyPrefix,
+      ttlSeconds: config.redisNodeTtlSeconds,
+      maxSamples: 100,
+    });
+    console.log(`[init] redis connected: ${config.redisUrl}`);
+  } catch (error) {
+    console.warn('[init] redis unavailable, continue with in-memory metrics only', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    redis?.disconnect();
+    redis = null;
+  }
 
   // Instance factory: blue/green alternate base ports via stride.
   let instanceGen = 0;
@@ -68,9 +95,13 @@ async function main() {
     refreshThreshold: config.refreshThreshold,
     refreshCooldownSeconds: config.refreshCooldownSeconds,
     clash: {
-      getCurrentOutbound: (tag) => activeClash.getCurrentOutbound(tag),
-      getNodeLatencies: () => activeClash.getNodeLatencies(),
+      setSelector: (tag) => activeClash.setSelector(tag),
+      getNodeLatencies: (options) => activeClash.getNodeLatencies(options),
     },
+    probeUrl: config.testUrl,
+    probeTimeoutMs: config.probeTimeoutMs,
+    activeProbeIntervalSeconds: config.activeProbeIntervalSeconds,
+    metricsStore,
     onBestChange: (bestKey) => {
       relay.setAccepting(Boolean(bestKey));
     },
@@ -103,15 +134,20 @@ async function main() {
     monitor.stop();
     relay.stop();
     await orchestrator.active.stop();
+    if (redis) {
+      await redis.quit();
+    }
   });
 
   process.on('SIGINT', () => {
     console.log('[shutdown] received SIGINT, cleaning up...');
     void app.stop();
+    process.exit(0);
   });
   process.on('SIGTERM', () => {
     console.log('[shutdown] received SIGTERM, cleaning up...');
     void app.stop();
+    process.exit(0);
   });
 
   app.listen(3000);

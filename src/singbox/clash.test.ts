@@ -141,6 +141,44 @@ describe('ClashClient.getNodeLatencies', () => {
     const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
     expect(await client.getNodeLatencies()).toEqual({ aaa: 120, bbb: 250 });
   });
+
+  it('actively probes outbounds via delay API before reading snapshot', async () => {
+    const delayCalls: string[] = [];
+    server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === '/proxies') {
+          return new Response(JSON.stringify({
+            proxies: {
+              'out-aaa': { history: [{ time: '2026-06-28T15:00:05+08:00', delay: 120 }] },
+              'out-bbb': { history: [{ time: '2026-06-28T15:00:05+08:00', delay: 250 }] },
+            },
+          }), { status: 200 });
+        }
+        if (url.pathname === '/proxies/out-aaa/delay' || url.pathname === '/proxies/out-bbb/delay') {
+          delayCalls.push(`${url.pathname}?${url.searchParams.toString()}`);
+          return new Response(JSON.stringify({ delay: 100 }), { status: 200 });
+        }
+        return new Response('not found', { status: 404 });
+      },
+    });
+
+    const client = new ClashClient(`http://127.0.0.1:${server.port}`, 's');
+    const result = await client.getNodeLatencies({
+      activeProbe: true,
+      probeUrl: 'https://www.google.com/generate_204',
+      probeTimeoutMs: 4321,
+      probeConcurrency: 2,
+    });
+
+    expect(result).toEqual({ aaa: 120, bbb: 250 });
+    expect(delayCalls.length).toBe(2);
+    expect(delayCalls.some((p) => p.startsWith('/proxies/out-aaa/delay?'))).toBe(true);
+    expect(delayCalls.some((p) => p.startsWith('/proxies/out-bbb/delay?'))).toBe(true);
+    expect(delayCalls.every((p) => p.includes('timeout=4321'))).toBe(true);
+    expect(delayCalls.every((p) => p.includes('url=https%3A%2F%2Fwww.google.com%2Fgenerate_204'))).toBe(true);
+  });
 });
 
 describe('ClashClient.waitReady', () => {

@@ -9,7 +9,7 @@ function node(key: string): Node {
   };
 }
 
-describe('buildConfig(urltest)', () => {
+describe('buildConfig(urltest + selector)', () => {
   it('creates a single in-proxy inbound and reports its port', async () => {
     const r = await buildConfig({
       nodes: [node('a')], basePort: 41100, proxyInboundOffset: 0, clashPort: 41950, clashSecret: 's',
@@ -36,7 +36,7 @@ describe('buildConfig(urltest)', () => {
     expect(inProxy!['users']).toEqual([{ username: 'demo-user', password: 'demo-pass' }]);
   });
 
-  it('adds urltest outbound over all node outbounds', async () => {
+  it('adds urltest outbound over all node outbounds for RTT probing', async () => {
     const r = await buildConfig({
       nodes: [node('a'), node('b')], basePort: 41200, proxyInboundOffset: 0, clashPort: 41960, clashSecret: 's', testUrl: 'https://http://cp.cloudflare.com',
     });
@@ -49,12 +49,23 @@ describe('buildConfig(urltest)', () => {
     expect(auto!['interrupt_exist_connections']).toBe(false);
   });
 
+  it('adds selector outbound as real egress', async () => {
+    const r = await buildConfig({
+      nodes: [node('a'), node('b')], basePort: 41210, proxyInboundOffset: 0, clashPort: 41961, clashSecret: 's',
+    });
+    const selector = r.config.outbounds.find((o) => o['tag'] === 'proxy-select');
+    expect(selector).toBeDefined();
+    expect(selector!['type']).toBe('selector');
+    expect(selector!['outbounds']).toEqual(['out-a', 'out-b']);
+    expect(selector!['default']).toBe('out-a');
+  });
+
   it('supports custom urltest interval from config', async () => {
     const r = await buildConfig({
       nodes: [node('a'), node('b')],
       basePort: 41220,
       proxyInboundOffset: 0,
-      clashPort: 41961,
+      clashPort: 41962,
       clashSecret: 's',
       urltestInterval: '45s',
     });
@@ -63,12 +74,12 @@ describe('buildConfig(urltest)', () => {
     expect(auto!['interval']).toBe('45s');
   });
 
-  it('routes in-proxy to proxy-auto', async () => {
+  it('routes in-proxy to proxy-select', async () => {
     const r = await buildConfig({
       nodes: [node('a')], basePort: 41300, proxyInboundOffset: 0, clashPort: 41970, clashSecret: 's',
     });
     expect(r.config.route.rules.some(
-      (rule) => Array.isArray(rule['inbound']) && (rule['inbound'] as string[]).includes('in-proxy') && rule['outbound'] === 'proxy-auto',
+      (rule) => Array.isArray(rule['inbound']) && (rule['inbound'] as string[]).includes('in-proxy') && rule['outbound'] === 'proxy-select',
     )).toBe(true);
   });
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import { Elysia } from 'elysia';
 import { registerRoutes } from './api.ts';
 import type { Monitor } from './monitor.ts';
-import type { Node } from './types.ts';
+import type { Node, NodeStatistics } from './types.ts';
 
 function makeNode(key: string): Node {
   return {
@@ -12,12 +12,28 @@ function makeNode(key: string): Node {
   };
 }
 
+function fakeStats(latency: number | null): NodeStatistics {
+  return {
+    currentRtt: latency ?? -1,
+    avgRtt: latency ?? -1,
+    medianRtt: latency ?? -1,
+    p95Rtt: latency ?? -1,
+    jitter: 0,
+    successRate: latency === null ? 0 : 100,
+    consecutiveFailure: latency === null ? 1 : 0,
+    sampleCount: 1,
+    lastSyncAt: new Date().toISOString(),
+  };
+}
+
 function fakeMonitor(nodes: Node[], bestKey: string | null, latencies: Record<string, number | null> = {}): Monitor {
   return {
     getNodes: () => nodes,
     getBestKey: () => bestKey,
     getBestNode: () => (bestKey ? nodes.find((n) => n.key === bestKey) ?? null : null),
     getLatency: (key: string) => latencies[key] ?? null,
+    getScore: (key: string) => (latencies[key] === null ? 0 : 80),
+    getStatistics: (key: string) => fakeStats(latencies[key] ?? null),
   } as unknown as Monitor;
 }
 
@@ -26,7 +42,7 @@ async function get(app: Elysia, path: string): Promise<Response> {
 }
 
 describe('GET /nodes', () => {
-  it('returns all nodes with isBest marker', async () => {
+  it('returns all nodes with isBest marker and score/statistics', async () => {
     const a = makeNode('aaa');
     const b = makeNode('bbb');
     const app = registerRoutes(new Elysia(), fakeMonitor([a, b], 'bbb', { aaa: 220, bbb: 88 }));
@@ -37,6 +53,9 @@ describe('GET /nodes', () => {
     expect(body.nodes.find((n: any) => n.key === 'bbb').isBest).toBe(true);
     expect(body.nodes.find((n: any) => n.key === 'aaa').latencyMs).toBe(220);
     expect(body.nodes.find((n: any) => n.key === 'bbb').latencyMs).toBe(88);
+    expect(typeof body.nodes.find((n: any) => n.key === 'bbb').score).toBe('number');
+    expect(body.nodes.find((n: any) => n.key === 'bbb').statistics.sampleCount).toBe(1);
+    expect(typeof body.nodes.find((n: any) => n.key === 'bbb').statistics.lastSyncAt).toBe('string');
   });
 });
 
@@ -71,11 +90,12 @@ describe('GET /nodes/available', () => {
 describe('GET /nodes/best', () => {
   it('returns the current best node', async () => {
     const b = makeNode('bbb');
-    const app = registerRoutes(new Elysia(), fakeMonitor([b], 'bbb'));
+    const app = registerRoutes(new Elysia(), fakeMonitor([b], 'bbb', { bbb: 90 }));
     const res = await get(app, '/nodes/best');
     const body = await res.json() as any;
     expect(body.best.key).toBe('bbb');
     expect(body.best.raw.password).toBe('pw-bbb');
+    expect(body.best.statistics.currentRtt).toBe(90);
   });
 
   it('returns null when no best node exists', async () => {
@@ -92,7 +112,7 @@ describe('GET /proxy', () => {
     const best = makeNode('best1');
     const app = registerRoutes(
       new Elysia(),
-      fakeMonitor([best], 'best1'),
+      fakeMonitor([best], 'best1', { best1: 80 }),
       { publicHost: 'gw.example.com', port: 8080 },
     );
     const res = await get(app, '/proxy');
@@ -100,6 +120,7 @@ describe('GET /proxy', () => {
     expect(res.status).toBe(200);
     expect(body.proxy).toBe('http://gw.example.com:8080');
     expect(body.node.key).toBe('best1');
+    expect(typeof body.node.score).toBe('number');
   });
 
   it('returns 503 with reason when no node is available', async () => {
@@ -121,7 +142,7 @@ describe('GET /proxy', () => {
     const best = makeNode('best2');
     const app = registerRoutes(
       new Elysia(),
-      fakeMonitor([best], 'best2'),
+      fakeMonitor([best], 'best2', { best2: 95 }),
       { publicHost: '', port: 9000 },
     );
     const res = await app.handle(new Request('http://my-host:1234/proxy'));

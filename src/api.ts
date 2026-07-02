@@ -12,7 +12,7 @@ function toView(node: {
   port: number;
   raw: Record<string, unknown>;
   originalUri: string;
-}, bestKey: string | null, latencyMs: number | null): NodeView {
+}, bestKey: string | null, latencyMs: number | null, score: number, statistics: NodeView['statistics']): NodeView {
   return {
     key: node.key,
     name: node.name,
@@ -21,6 +21,8 @@ function toView(node: {
     port: node.port,
     isBest: bestKey === node.key,
     latencyMs,
+    score,
+    statistics,
     raw: node.raw,
     originalUri: node.originalUri,
   };
@@ -34,7 +36,13 @@ export function registerRoutes(
   app.get('/nodes', async () => {
     const nodes = monitor.getNodes();
     const bestKey = monitor.getBestKey();
-    const result: NodeView[] = nodes.map((node) => toView(node, bestKey, monitor.getLatency(node.key)));
+    const result: NodeView[] = nodes.map((node) => toView(
+      node,
+      bestKey,
+      monitor.getLatency(node.key),
+      monitor.getScore(node.key),
+      monitor.getStatistics(node.key),
+    ));
     return { count: result.length, nodes: result };
   });
 
@@ -42,7 +50,13 @@ export function registerRoutes(
     const nodes = monitor.getNodes();
     const bestKey = monitor.getBestKey();
     const result: NodeView[] = nodes
-      .map((node) => toView(node, bestKey, monitor.getLatency(node.key)))
+      .map((node) => toView(
+        node,
+        bestKey,
+        monitor.getLatency(node.key),
+        monitor.getScore(node.key),
+        monitor.getStatistics(node.key),
+      ))
       .filter((node) => node.latencyMs !== null);
     return { count: result.length, nodes: result };
   });
@@ -50,7 +64,15 @@ export function registerRoutes(
   app.get('/nodes/best', async () => {
     const best = monitor.getBestNode();
     if (!best) return { best: null };
-    return { best: toView(best, best.key, monitor.getLatency(best.key)) };
+    return {
+      best: toView(
+        best,
+        best.key,
+        monitor.getLatency(best.key),
+        monitor.getScore(best.key),
+        monitor.getStatistics(best.key),
+      ),
+    };
   });
 
   app.get('/proxy', async ({ request, set }) => {
@@ -60,7 +82,7 @@ export function registerRoutes(
       return {
         proxy: null,
         node: null,
-        reason: 'no available node from urltest',
+        reason: 'no available node from score-selector',
       };
     }
 
@@ -70,7 +92,16 @@ export function registerRoutes(
       try { host = new URL(request.url).hostname || '127.0.0.1'; }
       catch { host = '127.0.0.1'; }
     }
-    return { proxy: `http://${host}:${port}`, node: toView(best, best.key, monitor.getLatency(best.key)) };
+    return {
+      proxy: `http://${host}:${port}`,
+      node: toView(
+        best,
+        best.key,
+        monitor.getLatency(best.key),
+        monitor.getScore(best.key),
+        monitor.getStatistics(best.key),
+      ),
+    };
   });
 
   return app;

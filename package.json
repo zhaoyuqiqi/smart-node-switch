@@ -13,7 +13,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "dayjs": "^1.11.21",
     "elysia": "^1.4.29",
+    "ioredis": "^5.8.1",
     "p-queue": "^9.3.0"
   }
 }

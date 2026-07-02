@@ -20,6 +20,19 @@ export interface NodeState {
   port: number;
 }
 
+export interface NodeStatistics {
+  currentRtt: number;
+  avgRtt: number;
+  medianRtt: number;
+  p95Rtt: number;
+  jitter: number;
+  successRate: number;
+  consecutiveFailure: number;
+  sampleCount: number;
+  /** 最近一次统计同步时间（ISO 8601） */
+  lastSyncAt?: string;
+}
+
 export interface NodeView {
   key: string;
   name: string;
@@ -28,6 +41,8 @@ export interface NodeView {
   port: number;
   isBest: boolean;
   latencyMs: number | null;
+  score: number;
+  statistics: NodeStatistics | null;
   raw: Record<string, unknown>;
   originalUri: string;
 }
@@ -39,6 +54,8 @@ export interface Config {
   refreshCooldownSeconds: number;
   testUrl: string;
   urltestInterval: string;
+  probeTimeoutMs: number;
+  activeProbeIntervalSeconds: number;
   singboxBasePort: number;
   singboxBin: string;
   proxyPort: number;
@@ -54,6 +71,9 @@ export interface Config {
   proxyAuthUser: string;
   proxyAuthPass: string;
   debugMonitor: boolean;
+  redisUrl: string;
+  redisKeyPrefix: string;
+  redisNodeTtlSeconds: number;
 }
 
 // Generate node identity key: sha1(protocol|server|port|credential|transportParams).slice(0,16)
