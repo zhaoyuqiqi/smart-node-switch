@@ -41,5 +41,7 @@ export function loadConfig(): Config {
     redisUrl,
     redisKeyPrefix: process.env['REDIS_KEY_PREFIX'] ?? 'sns:node-metrics',
     redisNodeTtlSeconds: Number(process.env['REDIS_NODE_TTL_SECONDS'] ?? 21600),
+    metricsFlushIntervalSeconds: Number(process.env['METRICS_FLUSH_INTERVAL_SECONDS'] ?? 300),
+    metricsFlushTopK: Number(process.env['METRICS_FLUSH_TOP_K'] ?? 10),
   };
 }

@@ -74,6 +74,8 @@ export interface Config {
   redisUrl: string;
   redisKeyPrefix: string;
   redisNodeTtlSeconds: number;
+  metricsFlushIntervalSeconds: number;
+  metricsFlushTopK: number;
 }
 
 // Generate node identity key: sha1(protocol|server|port|credential|transportParams).slice(0,16)

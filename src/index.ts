@@ -101,6 +101,8 @@ async function main() {
     probeUrl: config.testUrl,
     probeTimeoutMs: config.probeTimeoutMs,
     activeProbeIntervalSeconds: config.activeProbeIntervalSeconds,
+    metricsFlushIntervalSeconds: config.metricsFlushIntervalSeconds,
+    metricsFlushTopK: config.metricsFlushTopK,
     metricsStore,
     onBestChange: (bestKey) => {
       relay.setAccepting(Boolean(bestKey));

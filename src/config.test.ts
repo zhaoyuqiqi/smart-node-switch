@@ -30,6 +30,8 @@ describe('loadConfig', () => {
     'REDIS_URL',
     'REDIS_KEY_PREFIX',
     'REDIS_NODE_TTL_SECONDS',
+    'METRICS_FLUSH_INTERVAL_SECONDS',
+    'METRICS_FLUSH_TOP_K',
   ];
 
   beforeEach(() => {
@@ -92,6 +94,8 @@ describe('loadConfig', () => {
     expect(cfg.redisUrl).toBe('redis://127.0.0.1:6379');
     expect(cfg.redisKeyPrefix).toBe('sns:node-metrics');
     expect(cfg.redisNodeTtlSeconds).toBe(21600);
+    expect(cfg.metricsFlushIntervalSeconds).toBe(300);
+    expect(cfg.metricsFlushTopK).toBe(10);
   });
 
   it('overrides new proxy/clash config from env', () => {
@@ -105,6 +109,8 @@ describe('loadConfig', () => {
     process.env['REDIS_URL'] = 'redis://127.0.0.1:6380';
     process.env['REDIS_KEY_PREFIX'] = 'custom:prefix';
     process.env['REDIS_NODE_TTL_SECONDS'] = '3600';
+    process.env['METRICS_FLUSH_INTERVAL_SECONDS'] = '600';
+    process.env['METRICS_FLUSH_TOP_K'] = '6';
     const cfg = loadConfig();
     expect(cfg.proxyPort).toBe(18080);
     expect(cfg.clashApiSecret).toBe('fixed-secret');
@@ -115,6 +121,8 @@ describe('loadConfig', () => {
     expect(cfg.redisUrl).toBe('redis://127.0.0.1:6380');
     expect(cfg.redisKeyPrefix).toBe('custom:prefix');
     expect(cfg.redisNodeTtlSeconds).toBe(3600);
+    expect(cfg.metricsFlushIntervalSeconds).toBe(600);
+    expect(cfg.metricsFlushTopK).toBe(6);
   });
 });
 

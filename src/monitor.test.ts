@@ -305,4 +305,45 @@ describe('Monitor(score-selector)', () => {
     expect(seen[0]?.activeProbe).toBe(true);
     expect(seen[1]?.activeProbe).toBe(false);
   });
+
+  it('flushes Redis every interval and persists TopK only', async () => {
+    const nodes = Array.from({ length: 12 }, (_, i) => makeNode(`n${String(i + 1).padStart(2, '0')}`));
+    const recorded: Array<{ key: string; rtt: number }> = [];
+    let round = 0;
+
+    const metricsStore = {
+      async readRecentSamples() { return []; },
+      async record(key: string, rtt: number) {
+        recorded.push({ key, rtt });
+      },
+    } as unknown as NodeMetricsStore;
+
+    const monitor = new Monitor({
+      refresh: async () => nodes,
+      nodes,
+      intervalSeconds: 9999,
+      refreshThreshold: 0.1,
+      refreshCooldownSeconds: 9999,
+      metricsFlushIntervalSeconds: 300,
+      metricsFlushTopK: 10,
+      clash: {
+        async setSelector() {},
+        async getNodeLatencies() {
+          round += 1;
+          const result: Record<string, number | null> = {};
+          for (let i = 0; i < nodes.length; i++) {
+            result[nodes[i]!.key] = 50 + i + round;
+          }
+          return result;
+        },
+      },
+      metricsStore,
+    });
+
+    await monitor.runRound();
+    expect(recorded.length).toBe(10);
+
+    await monitor.runRound(true);
+    expect(recorded.length).toBe(10);
+  });
 });

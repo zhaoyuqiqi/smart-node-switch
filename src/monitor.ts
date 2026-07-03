@@ -19,6 +19,8 @@ export interface MonitorOptions {
   probeUrl?: string;
   probeTimeoutMs?: number;
   activeProbeIntervalSeconds?: number;
+  metricsFlushIntervalSeconds?: number;
+  metricsFlushTopK?: number;
   metricsStore?: NodeMetricsStore;
   orchestrator?: { blueGreenSwap(newNodes: Node[]): Promise<boolean> };
   onBestChange?: (bestKey: string | null) => void;
@@ -46,6 +48,7 @@ export class Monitor {
   private storeHydrated = false;
   private lastLatencySnapshotSignature: string | null = null;
   private lastActiveProbeAtMs = 0;
+  private lastMetricsFlushAtMs = 0;
 
   /**
    * 创建监控器实例，并以当前订阅节点集作为初始状态。
@@ -255,6 +258,32 @@ export class Monitor {
   }
 
   /**
+   * 基于配置与上次落盘时间，判断本轮是否应持久化到 Redis。
+   *
+   * @returns `true` 表示本轮应写 Redis；`false` 表示跳过持久化。
+   */
+  private shouldFlushMetricsNow(): boolean {
+    const intervalSeconds = Math.max(1, this.opts.metricsFlushIntervalSeconds ?? 300);
+    const intervalMs = intervalSeconds * 1000;
+    return Date.now() - this.lastMetricsFlushAtMs >= intervalMs;
+  }
+
+  /**
+   * 对候选节点做稳定排序：分数降序、RTT 升序、key 字典序。
+   */
+  private sortCandidates(candidates: CandidateNode[]): CandidateNode[] {
+    const ranked = [...candidates];
+    ranked.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aRtt = a.rtt ?? Number.POSITIVE_INFINITY;
+      const bRtt = b.rtt ?? Number.POSITIVE_INFINITY;
+      if (aRtt !== bRtt) return aRtt - bRtt;
+      return a.key.localeCompare(b.key);
+    });
+    return ranked;
+  }
+
+  /**
    * 同步统计信息、评分与 best 选择。
    *
    * @returns
@@ -268,7 +297,7 @@ export class Monitor {
    * 3. 签名去重（同快照直接跳过）；
    * 4. 维护每节点历史样本（超时写为 `-1`，最多 100 条）；
    * 5. 计算统计值和分数，并写入内存；
-   * 6. 持久化到 Redis（若启用）；
+   * 6. 按节流策略持久化 TopK 到 Redis（若启用）；
    * 7. 选出本轮最优节点；
    * 8. 仅当 best 发生变化时调用 `setSelector` 并触发 `onBestChange`。
    */
@@ -299,6 +328,7 @@ export class Monitor {
     this.latencyByKey = new Map();
 
     const candidates: CandidateNode[] = [];
+    const persistedRows: Array<{ key: string; sample: number; stats: NodeStatistics; score: number }> = [];
     const roundSyncAt = new Date().toISOString();
 
     for (const node of this.nodes) {
@@ -321,17 +351,28 @@ export class Monitor {
 
       this.statisticsByKey.set(node.key, stats);
       this.scoreByKey.set(node.key, score);
-
-      try {
-        await this.opts.metricsStore?.record(node.key, sample, stats, score);
-      } catch (error) {
-        console.warn('[monitor] metricsStore.record failed', {
-          key: node.key,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      persistedRows.push({ key: node.key, sample, stats, score });
 
       candidates.push({ key: node.key, score, rtt: latency });
+    }
+
+    if (this.shouldFlushMetricsNow()) {
+      const topK = Math.max(1, this.opts.metricsFlushTopK ?? 10);
+      const sorted = this.sortCandidates(candidates).slice(0, topK);
+      const selectedKeys = new Set(sorted.map((item) => item.key));
+      const rowsToPersist = persistedRows.filter((row) => selectedKeys.has(row.key));
+
+      for (const row of rowsToPersist) {
+        try {
+          await this.opts.metricsStore?.record(row.key, row.sample, row.stats, row.score);
+        } catch (error) {
+          console.warn('[monitor] metricsStore.record failed', {
+            key: row.key,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      this.lastMetricsFlushAtMs = Date.now();
     }
 
     const nextBest = this.pickBest(candidates);
@@ -379,14 +420,7 @@ export class Monitor {
    * 4. 再按 key 字典序稳定排序。
    */
   private pickBest(candidates: CandidateNode[]): string | null {
-    const ranked = candidates.filter((c) => c.score > 0);
-    ranked.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const aRtt = a.rtt ?? Number.POSITIVE_INFINITY;
-      const bRtt = b.rtt ?? Number.POSITIVE_INFINITY;
-      if (aRtt !== bRtt) return aRtt - bRtt;
-      return a.key.localeCompare(b.key);
-    });
+    const ranked = this.sortCandidates(candidates).filter((c) => c.score > 0);
     return ranked[0]?.key ?? null;
   }
 
@@ -413,11 +447,11 @@ export class Monitor {
     if (nowSec - this.lastRefreshAt < refreshCooldownSeconds) return;
 
     const availableRatio = this.bestKey ? 1 : 0;
-    const healthyCount = this.nodes.filter((n) => (this.scoreByKey.get(n.key) ?? 0) >= 60).length;
+    const healthyCount = this.nodes.filter((n) => (this.scoreByKey.get(n.key) ?? 0) >= 50).length;
     const healthyRatio = healthyCount / total;
 
     // Rule: if score >=60 nodes are lower than 10% of all nodes, trigger subscription refresh.
-    const shouldRefreshByScore = healthyRatio < 0.1;
+    const shouldRefreshByScore = healthyRatio < refreshThreshold;
     const shouldRefreshByAvailability = availableRatio < refreshThreshold;
 
     if (!shouldRefreshByAvailability && !shouldRefreshByScore) return;

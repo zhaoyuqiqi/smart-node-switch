@@ -91,6 +91,8 @@ docker run --rm \
 | `DEBUG_MONITOR` | `false` | 打印评分/测速诊断日志（`1/true` 开启） |
 | `REDIS_URL` | `redis://127.0.0.1:6379` | Redis 连接地址（用于保存节点 RTT 与统计） |
 | `REDIS_KEY_PREFIX` | `sns:node-metrics` | Redis key 前缀 |
+| `METRICS_FLUSH_INTERVAL_SECONDS` | `300` | Redis 统计落盘间隔（秒），默认每 5 分钟写一次 |
+| `METRICS_FLUSH_TOP_K` | `10` | 每次落盘仅写入分数 TopK 节点，默认 Top10 |
 | `REDIS_NODE_TTL_SECONDS` | `21600` | 每个节点 RTT 列表与统计 Hash 的过期时间（秒，默认 6 小时，写入时自动续期） |
 
 ## 运行
