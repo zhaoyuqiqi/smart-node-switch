@@ -43,6 +43,7 @@ docker run --rm \
   -e PROXY_AUTH_USER='your-user' \
   -e PROXY_AUTH_PASS='your-pass' \
   -p 8080:8080 \
+  -p 34567:34567 \
   smart-node-switch:latest
 ```
 
@@ -52,6 +53,7 @@ docker run --rm \
 docker run --rm \
   -e SUBSCRIPTION_URL='https://your.sub/link' \
   -p 8080:8080 \
+  -p 34567:34567 \
   -p 3000:3000 \
   smart-node-switch:latest
 ```
@@ -59,6 +61,7 @@ docker run --rm \
 端口建议：
 
 - 建议只对公网暴露 `8080`（代理入口）。
+- 如需使用 naive-proxy 入口，需要额外发布 `34567`（例如 `-p 34567:34567`）。
 - `3000`（业务 API）与 `9090`（clash API）尽量仅保留容器内访问。
 - 若对公网暴露 `8080`，建议同时设置 `PROXY_AUTH_USER` 与 `PROXY_AUTH_PASS`。
 

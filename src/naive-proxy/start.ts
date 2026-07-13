@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { chmod } from "node:fs/promises";
 import { connect } from "node:net";
-import { proxyAddress, urls } from "./config";
+import { proxyListenAddress, proxyTestAddress, urls } from "./config";
 
 interface Config {
   listen?: string;
@@ -28,17 +28,17 @@ async function setProxyAndTest(config: Config) {
   }
   await chmod(binPath, 0o755);
   const child = spawn(binPath, [
-    `--listen=${proxyAddress}`,
+    `--listen=${proxyListenAddress}`,
     `--proxy=${config.proxy}`,
   ]);
-  const isReady = await waitForProxyReady(proxyAddress);
+  const isReady = await waitForProxyReady(proxyTestAddress);
   if (!isReady) {
     child.kill();
     return false;
   }
   const isAvailable = await testAvailable();
   console.log(isAvailable, [
-    `--listen=${proxyAddress}`,
+    `--listen=${proxyListenAddress}`,
     `--proxy=${config.proxy}`,
   ]);
   if (!isAvailable) {
@@ -80,7 +80,7 @@ async function canConnect(host: string, port: number) {
 async function testAvailable() {
   try {
     const res = await fetch("https://www.google.com", {
-      proxy: proxyAddress,
+      proxy: proxyTestAddress,
     });
     return res.ok;
   } catch {
