@@ -31,5 +31,5 @@ COPY src ./src
 
 RUN chmod +x /app/src/sing-box/sing-box-linux
 
-EXPOSE 3000 8080 9090
+EXPOSE 3000 8080 9090 34567
 CMD ["bun", "run", "src/index.ts"]
