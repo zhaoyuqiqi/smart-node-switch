@@ -105,6 +105,7 @@ async function main() {
   console.log("naive proxy is avaiable");
 }
 
-setInterval(main, 30_000);
-
-main();
+export function naiveProxyStart() {
+  main();
+  setInterval(main, 30_000);
+}
